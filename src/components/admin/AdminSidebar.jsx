@@ -18,7 +18,7 @@ const Sidebar = () => {
     { name: 'Dashboard', icon: HomeIcon, path: '/admin/dashboard' },
     { name: 'User Management', icon: UsersIcon, path: '/admin/users' },
     { name: 'Content Management', icon: PhotoIcon, path: '/admin/content-management' },
-    { name: 'Video Management', icon: VideoCameraIcon, path: '/admin/video-management' },
+    
     { name: 'Booking Management', icon: CalendarIcon, path: '/admin/booking-management' },
     { name: 'Live Streams', icon: SignalIcon, path: '/admin/live-streams' },
     { name: 'Reports', icon: ChartBarIcon, path: '/admin/reports' },

@@ -51,7 +51,7 @@ function App() {
       setIsAuthenticated(false);
       setUserRole(null);
     }
-  }, []);
+  }, [location.pathname]);
 
   const isAdminRoute = location.pathname.startsWith("/admin");
 
@@ -81,7 +81,7 @@ function App() {
                 <Routes>
                   <Route path="/admin/dashboard" element={<Dashboard />} />
                   <Route path="/admin/content-management" element={<ContentManagement />} />
-                  <Route path="/admin/video-management" element={<VideoManagement />} />
+                 
                   <Route path="/admin/booking-management" element={<BookingManagement />} />
                   <Route path="/admin/live-streams" element={<LiveStreams />} />
                   <Route path="/admin/reports" element={<Reports />} />

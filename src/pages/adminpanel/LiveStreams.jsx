@@ -5,28 +5,13 @@ const LiveStreams = () => {
   const [streams] = useState([
     { 
       id: 1, 
-      title: 'Morning Yoga Session',
-      host: 'Sarah Wilson',
+      title: ' Session 1',
+      host: 'Ansh Parikh',
       viewers: 156,
       status: 'Live',
       duration: '45:23'
     },
-    { 
-      id: 2, 
-      title: 'Cooking Workshop',
-      host: 'Chef Michael',
-      viewers: 89,
-      status: 'Scheduled',
-      startTime: '2:00 PM'
-    },
-    { 
-      id: 3, 
-      title: 'Guitar Masterclass',
-      host: 'John Smith',
-      viewers: 234,
-      status: 'Live',
-      duration: '1:12:45'
-    },
+
   ]);
 
   return (
@@ -34,9 +19,7 @@ const LiveStreams = () => {
       <div className="bg-white rounded-lg shadow p-6">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-semibold">Live Streams</h2>
-          <button className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors">
-            Create Stream
-          </button>
+
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

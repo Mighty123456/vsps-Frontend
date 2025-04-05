@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { FaVideo, FaUser, FaBars, FaTimes } from 'react-icons/fa';
 
@@ -6,8 +6,15 @@ function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState(null);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+
+  // Check authentication status when component mounts or location changes
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    setIsLoggedIn(!!token);
+  }, [location.pathname]);
 
   const navigationItems = [
     {
@@ -64,15 +71,13 @@ function Header() {
     navigate('/auth');
   };
 
-  const isLoggedIn = localStorage.getItem('token') != null;
-
   return (
     <header className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg relative z-50">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-2">
-            <FaVideo className="text-2xl" />
+            {/* <FaVideo className="text-2xl" /> */}
             <span className="text-2xl font-bold">VSPS</span>
           </Link>
 

@@ -5,7 +5,7 @@ import parse from 'date-fns/parse';
 import startOfWeek from 'date-fns/startOfWeek';
 import getDay from 'date-fns/getDay';
 import enUS from 'date-fns/locale/en-US';
-import { FaCalendarAlt, FaUserFriends, FaClock, FaEnvelope, FaPhone, FaUser, FaCheckCircle } from 'react-icons/fa';
+import { FaCalendarAlt, FaUserFriends, FaClock, FaEnvelope, FaPhone, FaUser, FaCheckCircle, FaEye, FaTimes } from 'react-icons/fa';
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import "react-datepicker/dist/react-datepicker.css";
 import axios from 'axios';
@@ -28,20 +28,22 @@ const localizer = dateFnsLocalizer({
 function Booking() {
   const navigate = useNavigate();
   const [selectedDate, setSelectedDate] = useState(null);
+  const [hoveredDate, setHoveredDate] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  const [showDocumentViewer, setShowDocumentViewer] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState(null);
+  const [selectedDocumentType, setSelectedDocumentType] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     phone: '',
     eventType: '',
     guestCount: '',
-    startTime: '',
-    endTime: '',
     additionalNotes: '',
-    eventDocument: '',
-    documentType: 'Other'
+    eventDocuments: [],
+    documentTypes: []
   });
   const [bookedEvents, setBookedEvents] = useState([]);
   const [error, setError] = useState(null);
@@ -52,6 +54,30 @@ function Booking() {
     // Check if user is authenticated
     const token = localStorage.getItem('token');
     setIsAuthenticated(!!token);
+    
+    if (token) {
+      // Fetch user profile to get email
+      const fetchUserProfile = async () => {
+        try {
+          const response = await axios.get('/api/users/profile', {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          });
+          
+          if (response.data && response.data.email) {
+            setFormData(prev => ({
+              ...prev,
+              email: response.data.email
+            }));
+          }
+        } catch (error) {
+          console.error('Error fetching user profile:', error);
+        }
+      };
+      
+      fetchUserProfile();
+    }
     
     // Check if there's a stored booking date from previous session
     const storedDate = localStorage.getItem('selectedBookingDate');
@@ -69,7 +95,9 @@ function Booking() {
     try {
       const response = await axios.get('/api/bookings');
       const bookingsData = Array.isArray(response.data) ? response.data : [];
-      setBookedEvents(bookingsData.map(booking => ({
+      // Filter out rejected bookings and only show pending and booked events
+      const filteredBookings = bookingsData.filter(booking => booking.status !== 'Rejected');
+      setBookedEvents(filteredBookings.map(booking => ({
         title: booking.status,
         start: new Date(booking.date),
         end: new Date(booking.date),
@@ -85,12 +113,22 @@ function Booking() {
 
   const isDateBooked = (date) => {
     return bookedEvents.some(event => 
-      format(date, 'yyyy-MM-dd') === format(event.start, 'yyyy-MM-dd') && event.status === 'Booked'
+      format(date, 'yyyy-MM-dd') === format(event.start, 'yyyy-MM-dd') && 
+      (event.status === 'Booked' || event.status === 'Pending')
     );
   };
 
   const handleDateSelect = (slotInfo) => {
     const selectedDate = new Date(slotInfo.start);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Check if the selected date is in the past
+    if (selectedDate < today) {
+      alert('You cannot book dates in the past. Please select a future date.');
+      return;
+    }
+    
     if (isDateBooked(selectedDate)) {
       alert('This date is already booked. Please select another date.');
       return;
@@ -111,6 +149,14 @@ function Booking() {
     setShowForm(true);
   };
 
+  const handleDateHover = (slotInfo) => {
+    setHoveredDate(new Date(slotInfo.start));
+  };
+
+  const handleDateLeave = () => {
+    setHoveredDate(null);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -120,7 +166,20 @@ function Booking() {
         throw new Error('No authentication token found');
       }
 
+      // Check if at least one document is uploaded
+      if (formData.eventDocuments.length === 0) {
+        alert('Please upload at least one document');
+        setIsSubmitting(false);
+        return;
+      }
+
       const formattedDate = selectedDate.toISOString();
+      
+      // Ensure document URL is properly formatted
+      let documentUrl = formData.eventDocuments[0];
+      if (documentUrl.startsWith('http:/')) {
+        documentUrl = documentUrl.replace('http:/', 'http://');
+      }
       
       const bookingData = {
         name: formData.name,
@@ -128,13 +187,16 @@ function Booking() {
         phone: formData.phone,
         eventType: formData.eventType,
         date: formattedDate,
-        startTime: formData.startTime,
-        endTime: formData.endTime,
         guestCount: parseInt(formData.guestCount),
         additionalNotes: formData.additionalNotes,
-        eventDocument: formData.eventDocument,
+        // Use the first document as the eventDocument
+        eventDocument: documentUrl,
+        // Use the first document type as the documentType
+        documentType: formData.documentTypes[0] || 'Other',
         status: 'Pending'
       };
+
+      console.log('Submitting booking data:', bookingData);
 
       const response = await axios.post('/api/bookings/submit', bookingData, {
         headers: {
@@ -151,11 +213,9 @@ function Booking() {
           phone: '',
           eventType: '',
           guestCount: '',
-          startTime: '',
-          endTime: '',
           additionalNotes: '',
-          eventDocument: '',
-          documentType: 'Other'
+          eventDocuments: [],
+          documentTypes: []
         });
         fetchBookings();
         
@@ -184,10 +244,14 @@ function Booking() {
   };
 
   const handleFileChange = async (e) => {
-    const file = e.target.files[0];
-    if (file) {
+    const files = Array.from(e.target.files);
+    if (files.length > 0) {
       const formData = new FormData();
-      formData.append('document', file);
+      
+      // Append each file to the FormData with the correct key 'document'
+      files.forEach((file, index) => {
+        formData.append(`document`, file);
+      });
       
       try {
         const token = localStorage.getItem('token');
@@ -202,41 +266,172 @@ function Booking() {
           }
         });
         
+        console.log('Document upload response:', response.data);
+        
+        // Update state with the new document
         setFormData(prev => ({
           ...prev,
-          eventDocument: response.data.documentUrl,
-          documentType: response.data.documentType
+          eventDocuments: [...prev.eventDocuments, response.data.documentUrl],
+          documentTypes: [...prev.documentTypes, response.data.documentType]
         }));
       } catch (error) {
-        console.error('Error uploading document:', error);
+        console.error('Error uploading documents:', error);
         if (error.response?.status === 401) {
           navigate('/auth');
         } else {
-          alert('Failed to upload document');
+          alert('Failed to upload documents: ' + (error.response?.data?.message || error.message));
         }
       }
     }
   };
 
-  const eventStyleGetter = (event) => {
-    let backgroundColor = 'transparent'; // Default to transparent for rejected events
-    if (event.status === 'Pending') {
-      backgroundColor = '#fbbf24'; // Yellow for pending
-    } else if (event.status === 'Booked') {
-      backgroundColor = '#ef4444'; // Red for booked
+  const removeDocument = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      eventDocuments: prev.eventDocuments.filter((_, i) => i !== index),
+      documentTypes: prev.documentTypes.filter((_, i) => i !== index)
+    }));
+  };
+
+  const viewDocument = (docUrl, docType) => {
+    // Ensure the URL is properly formatted
+    let formattedUrl = docUrl;
+    
+    // Fix common URL issues
+    if (formattedUrl.startsWith('http:/')) {
+      formattedUrl = formattedUrl.replace('http:/', 'http://');
     }
+    
+    // Determine file type from URL
+    const fileExtension = formattedUrl.split('.').pop().toLowerCase();
+    const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension);
+    
+    // For non-image files, directly open in default application
+    if (!isImage) {
+      window.open(formattedUrl, '_blank');
+      return;
+    }
+    
+    // For images, show in modal
+    setSelectedDocument(formattedUrl);
+    setSelectedDocumentType(docType || 'Document');
+    setShowDocumentViewer(true);
+  };
+  
+  const closeDocumentViewer = () => {
+    setShowDocumentViewer(false);
+    setSelectedDocument(null);
+    setSelectedDocumentType('');
+  };
+
+  const eventStyleGetter = (event) => {
+    let style = {
+      backgroundColor: '#7c3aed',
+      borderRadius: '8px',
+      opacity: 0.95,
+      color: 'white',
+      border: '0px',
+      display: 'block',
+      padding: '4px 8px',
+      fontSize: '0.75rem',
+      fontWeight: '600',
+      boxShadow: '0 4px 6px -1px rgba(124, 58, 237, 0.2)',
+      transition: 'all 0.3s ease-in-out',
+      textTransform: 'capitalize',
+      margin: '2px 0',
+      textAlign: 'center'
+    };
+
+    if (event.status === 'Booked') {
+      style.backgroundColor = '#dc2626';
+    } else if (event.status === 'Pending') {
+      style.backgroundColor = '#d97706';
+    }
+
     return {
+      style
+    };
+  };
+
+  const dayPropGetter = (date) => {
+    const isHovered = hoveredDate && format(date, 'yyyy-MM-dd') === format(hoveredDate, 'yyyy-MM-dd');
+    const isSelected = selectedDate && format(date, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd');
+    const isBooked = isDateBooked(date);
+    const isToday = format(date, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
+    const isPast = date < new Date(new Date().setHours(0, 0, 0, 0));
+
+    return {
+      className: `transition-all duration-300 ${
+        isHovered && !isBooked && !isPast ? 'bg-violet-200 cursor-pointer hover:bg-violet-300 hover:scale-105 hover:shadow-md' : ''
+      } ${
+        isSelected ? 'bg-violet-300 font-bold ring-2 ring-violet-600 ring-opacity-70 scale-105 shadow-md' : ''
+      } ${
+        isBooked ? 'bg-red-100 cursor-not-allowed' : ''
+      } ${
+        isToday ? 'font-bold text-violet-700 ring-1 ring-violet-400' : ''
+      } ${
+        isPast ? 'bg-gray-100 cursor-not-allowed opacity-50' : ''
+      }`,
       style: {
-        backgroundColor,
-        borderRadius: '5px',
-        opacity: 0.8,
-        color: 'white', // Make text visible
-        border: '0',
-        display: 'block'
+        borderRadius: '12px',
+        margin: '3px',
+        minHeight: '90px',
+        position: 'relative',
+        boxShadow: isSelected ? '0 4px 8px -2px rgba(124, 58, 237, 0.4)' : 'none',
+        transition: 'all 0.3s ease-in-out',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center'
       }
     };
   };
   
+  const calendarCustomStyles = {
+    className: 'custom-calendar',
+    style: {
+      height: '650px',
+      backgroundColor: 'white',
+      borderRadius: '16px',
+      boxShadow: '0 8px 16px -4px rgba(124, 58, 237, 0.1)',
+      padding: '20px'
+    }
+  };
+
+  const calendarComponents = {
+    toolbar: (props) => (
+      <div className="flex justify-between items-center mb-6 p-3 bg-gradient-to-r from-violet-50 to-purple-50 rounded-xl">
+        <button
+          onClick={() => props.onNavigate('PREV')}
+          className="p-2 hover:bg-white rounded-lg transition-all duration-300 text-violet-700 font-medium hover:shadow-sm"
+        >
+          ←
+        </button>
+        <span className="text-xl font-bold text-violet-900">
+          {format(props.date, 'yyyy')}
+        </span>
+        <button
+          onClick={() => props.onNavigate('NEXT')}
+          className="p-2 hover:bg-white rounded-lg transition-all duration-300 text-violet-700 font-medium hover:shadow-sm"
+        >
+          →
+        </button>
+      </div>
+    ),
+    month: {
+      header: ({ date }) => (
+        <div className="text-center font-bold text-violet-900 py-3 text-lg">
+          {format(date, 'MMMM')}
+        </div>
+      ),
+      dateHeader: ({ date }) => (
+        <div className="text-center font-medium text-gray-600 py-2">
+          {format(date, 'd')}
+        </div>
+      )
+    }
+  };
+
   // Show loading state while checking authentication
   if (isLoading) {
     return (
@@ -251,6 +446,40 @@ function Booking() {
   
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Document Viewer Modal */}
+      {showDocumentViewer && selectedDocument && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium">{selectedDocumentType} Viewer</h3>
+              <button
+                onClick={closeDocumentViewer}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <FaTimes className="h-6 w-6" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-hidden flex flex-col items-center justify-center">
+              <img 
+                src={selectedDocument} 
+                alt={selectedDocumentType} 
+                className="max-w-full max-h-[80vh] object-contain"
+                onError={(e) => {
+                  console.error('Error loading image:', e);
+                  e.target.style.display = 'none';
+                  e.target.parentElement.innerHTML = `
+                    <div class="text-center p-4">
+                      <p class="text-red-500 mb-2">Error loading image</p>
+                      <a href="${selectedDocument}" target="_blank" class="text-indigo-600 hover:underline">Open in new tab</a>
+                    </div>
+                  `;
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+      
       {/* Success Popup */}
       {showSuccessPopup && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -291,48 +520,79 @@ function Booking() {
       </div>
 
       <div className="container mx-auto px-4 py-12">
-        {/* Calendar Legend */}
-        <div className="mb-8">
-          <div className="bg-white rounded-xl shadow-md p-4">
-            <h3 className="text-lg font-semibold mb-3">Calendar Legend</h3>
-            <div className="flex space-x-6">
-              <div className="flex items-center">
-                <div className="w-4 h-4 rounded bg-[#fbbf24] mr-2"></div>
-                <span>Pending</span>
-              </div>
-              <div className="flex items-center">
-                <div className="w-4 h-4 rounded bg-[#ef4444] mr-2"></div>
-                <span>Booked</span>
-              </div>
-            </div>
-          </div>
-        </div>
+       
 
-        <div className="grid lg:grid-cols-3 gap-8">
-          {/* Calendar Section */}
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <Calendar
-                localizer={localizer}
-                events={bookedEvents}
-                startAccessor="start"
-                endAccessor="end"
-                style={{ height: 600 }}
-                onSelectSlot={handleDateSelect}
-                selectable
-                eventPropGetter={eventStyleGetter}
-                views={['month']}
-              />
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="bg-white rounded-2xl shadow-lg p-6">
+            <div className="mb-6">
+              <h3 className="text-xl font-bold text-gray-900 mb-4">Select Your Date</h3>
+              <div className="flex flex-wrap gap-4 text-sm">
+                <div className="flex items-center bg-violet-50 px-3 py-2 rounded-lg">
+                  <div className="w-3 h-3 rounded-full bg-violet-600 mr-2"></div>
+                  <span className="font-medium text-violet-900">Available</span>
+                </div>
+                <div className="flex items-center bg-red-50 px-3 py-2 rounded-lg">
+                  <div className="w-3 h-3 rounded-full bg-red-500 mr-2"></div>
+                  <span className="font-medium text-red-900">Booked</span>
+                </div>
+                <div className="flex items-center bg-amber-50 px-3 py-2 rounded-lg">
+                  <div className="w-3 h-3 rounded-full bg-amber-500 mr-2"></div>
+                  <span className="font-medium text-amber-900">Pending</span>
+                </div>
+                <div className="flex items-center bg-gray-50 px-3 py-2 rounded-lg">
+                  <div className="w-3 h-3 rounded-full bg-gray-400 mr-2"></div>
+                  <span className="font-medium text-gray-600">Past Date</span>
+                </div>
+              </div>
+              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-blue-700 text-sm">
+                  <strong>Note:</strong> You cannot book dates in the past. Please select a future date.
+                </p>
+              </div>
             </div>
+            <Calendar
+              localizer={localizer}
+              events={bookedEvents}
+              startAccessor="start"
+              endAccessor="end"
+              {...calendarCustomStyles}
+              onSelectSlot={handleDateSelect}
+              selectable
+              views={['month']}
+              defaultView="month"
+              eventPropGetter={eventStyleGetter}
+              dayPropGetter={dayPropGetter}
+              onMouseEnter={handleDateHover}
+              onMouseLeave={handleDateLeave}
+              tooltipAccessor={event => `${event.title} - ${format(event.start, 'MMMM d, yyyy')}`}
+              components={calendarComponents}
+              formats={{
+                dateFormat: 'd',
+                dayFormat: 'd',
+                monthHeaderFormat: 'MMMM',
+                dayHeaderFormat: 'd',
+                dayRangeHeaderFormat: ({ start, end }) => `${format(start, 'd')} - ${format(end, 'd')}`
+              }}
+              min={new Date()} // Set minimum date to today
+            />
           </div>
 
           {/* Booking Form Section */}
           <div className="lg:col-span-1">
             {showForm ? (
-              <div className="bg-white rounded-xl shadow-md p-6">
-                <h2 className="text-2xl font-bold text-gray-900 mb-6">
-                  Book for {selectedDate && format(selectedDate, 'MMMM d, yyyy')}
-                </h2>
+              <div className="bg-white rounded-2xl shadow-lg p-6">
+                <div className="mb-6 p-4 bg-violet-50 rounded-xl border border-violet-200">
+                  <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                    Selected Date:
+                  </h2>
+                  <div className="text-3xl font-bold text-violet-700">
+                    {selectedDate && format(selectedDate, 'MMMM d, yyyy')}
+                  </div>
+                  <div className="mt-2 text-sm text-violet-600">
+                    {selectedDate && format(selectedDate, 'EEEE')}
+                  </div>
+                </div>
                 <form onSubmit={handleSubmit} className="space-y-6">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -365,8 +625,8 @@ function Booking() {
                         type="email"
                         name="email"
                         value={formData.email}
-                        onChange={handleChange}
-                        className="pl-10 w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        disabled
+                        className="pl-10 w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed"
                         required
                       />
                     </div>
@@ -429,52 +689,13 @@ function Booking() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Start Time
-                      </label>
-                      <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                          <FaClock className="text-gray-400" />
-                        </div>
-                        <input
-                          type="time"
-                          name="startTime"
-                          value={formData.startTime}
-                          onChange={handleChange}
-                          className="pl-10 w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                          required
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        End Time
-                      </label>
-                      <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                          <FaClock className="text-gray-400" />
-                        </div>
-                        <input
-                          type="time"
-                          name="endTime"
-                          value={formData.endTime}
-                          onChange={handleChange}
-                          className="pl-10 w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                          required
-                        />
-                      </div>
-                    </div>
-                  </div>
-
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Event Document
+                      Event Documents
                     </label>
                     <div className="mb-2">
                       <p className="text-sm text-gray-600 mb-2">
-                        Please upload one of the following documents:
+                        Please upload one or more of the following documents:
                       </p>
                       <ul className="text-sm text-gray-600 list-disc pl-5 mb-3">
                         <li>Government-issued ID (Aadhar Card, PAN Card, or Passport)</li>
@@ -484,16 +705,48 @@ function Booking() {
                         <li>Marriage certificate (for weddings)</li>
                       </ul>
                       <p className="text-sm text-gray-600 mb-2">
-                        Accepted formats: PDF, DOC, DOCX (Max size: 5MB)
+                        Accepted formats: PDF, DOC, DOCX (Max size: 5MB per file)
                       </p>
                     </div>
                     <input
                       type="file"
                       accept=".pdf,.doc,.docx"
                       onChange={handleFileChange}
+                      multiple
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                      required
+                      required={formData.eventDocuments.length === 0}
                     />
+                    
+                    {formData.eventDocuments.length > 0 && (
+                      <div className="mt-4">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Uploaded Documents:</h4>
+                        <ul className="space-y-2">
+                          {formData.eventDocuments.map((doc, index) => (
+                            <li key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded-lg">
+                              <span className="text-sm text-gray-700 truncate">
+                                {doc.split('/').pop()} ({formData.documentTypes[index]})
+                              </span>
+                              <div className="flex space-x-2">
+                                <button
+                                  type="button"
+                                  onClick={() => viewDocument(doc, formData.documentTypes[index])}
+                                  className="text-blue-500 hover:text-blue-700 flex items-center"
+                                >
+                                  <FaEye className="mr-1" /> View
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => removeDocument(index)}
+                                  className="text-red-500 hover:text-red-700"
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
 
                   <div>
@@ -530,7 +783,7 @@ function Booking() {
                 </form>
               </div>
             ) : (
-              <div className="bg-white rounded-xl shadow-md p-6">
+              <div className="bg-white rounded-2xl shadow-lg p-6">
                 <div className="text-center">
                   <FaCalendarAlt className="text-6xl text-purple-600 mx-auto mb-4" />
                   <h2 className="text-2xl font-bold text-gray-900 mb-2">

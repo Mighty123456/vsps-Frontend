@@ -110,7 +110,8 @@ function Auth() {
                 // Redirect to booking page
                 navigate('/booking');
               } else {
-                navigate('/');
+                // Force a page reload to update authentication state
+                window.location.href = '/';
               }
             }
           } catch (error) {

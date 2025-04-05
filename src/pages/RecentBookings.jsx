@@ -6,6 +6,19 @@ import { FaCalendar, FaClock, FaUsers, FaFileAlt, FaCheckCircle, FaTimesCircle, 
 axios.defaults.baseURL = 'http://localhost:3000';
 
 const DocumentViewer = ({ documentUrl, documentType, onClose }) => {
+  console.log('Viewing document in RecentBookings:', { documentUrl, documentType });
+  
+  // Determine file type from URL
+  const fileExtension = documentUrl.split('.').pop().toLowerCase();
+  const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension);
+  
+  // For non-image files, directly open in default application
+  if (!isImage) {
+    window.open(documentUrl, '_blank');
+    onClose(); // Close the modal after opening the document
+    return null;
+  }
+  
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col">
@@ -19,16 +32,21 @@ const DocumentViewer = ({ documentUrl, documentType, onClose }) => {
           </button>
         </div>
         <div className="flex-1 overflow-hidden flex flex-col items-center justify-center">
-          <p className="text-gray-700 mb-6">Click the button below to view your {documentType} in a new tab:</p>
-          <a 
-            href={documentUrl} 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="px-6 py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-lg font-medium"
-          >
-            View {documentType}
-          </a>
-          <p className="text-gray-500 mt-4 text-sm">This will open your {documentType} in a new browser tab where you can view, download, or print it.</p>
+          <img 
+            src={documentUrl} 
+            alt={documentType} 
+            className="max-w-full max-h-[80vh] object-contain"
+            onError={(e) => {
+              console.error('Error loading image:', e);
+              e.target.style.display = 'none';
+              e.target.parentElement.innerHTML = `
+                <div class="text-center p-4">
+                  <p class="text-red-500 mb-2">Error loading image</p>
+                  <a href="${documentUrl}" target="_blank" class="text-indigo-600 hover:underline">Open in new tab</a>
+                </div>
+              `;
+            }}
+          />
         </div>
       </div>
     </div>
@@ -119,7 +137,16 @@ const RecentBookings = () => {
   };
 
   const handleViewDocument = (documentUrl, documentType) => {
-    setSelectedDocument(documentUrl);
+    console.log('Viewing document in RecentBookings:', { documentUrl, documentType });
+    
+    // Ensure the URL is properly formatted
+    const formattedUrl = documentUrl.startsWith('http') 
+      ? documentUrl 
+      : `http://localhost:3000${documentUrl.startsWith('/') ? '' : '/'}${documentUrl}`;
+    
+    console.log('Formatted URL:', formattedUrl);
+    
+    setSelectedDocument(formattedUrl);
     setSelectedDocumentType(documentType || 'Document');
     setShowDocumentViewer(true);
   };

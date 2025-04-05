@@ -4,8 +4,7 @@ import { PencilIcon, TrashIcon, PlayIcon } from '@heroicons/react/24/outline';
 const VideoManagement = () => {
   const [videos] = useState([
     { id: 1, title: 'Introduction Video', duration: '2:30', status: 'Published', views: 1234 },
-    { id: 2, title: 'Product Demo', duration: '5:45', status: 'Processing', views: 890 },
-    { id: 3, title: 'Tutorial', duration: '10:15', status: 'Published', views: 2345 },
+
   ]);
 
   return (

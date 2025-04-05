@@ -16,20 +16,20 @@ const Reports = () => {
   const [selectedReport, setSelectedReport] = useState('monthly');
   
   const monthlyData = [
-    { name: 'Jan', revenue: 4000, bookings: 240 },
-    { name: 'Feb', revenue: 3000, bookings: 198 },
-    { name: 'Mar', revenue: 6000, bookings: 320 },
-    { name: 'Apr', revenue: 8000, bookings: 480 },
-    { name: 'May', revenue: 5000, bookings: 250 },
-    { name: 'Jun', revenue: 7000, bookings: 360 },
+    { name: 'Jan', revenue: 0, bookings: 0 },
+    { name: 'Feb', revenue: 0, bookings: 0 },
+    { name: 'Mar', revenue: 0, bookings: 0 },
+    { name: 'Apr', revenue: 0, bookings: 0 },
+    { name: 'May', revenue: 0, bookings: 0 },
+    { name: 'Jun', revenue: 0, bookings: 0 },
   ];
 
   const yearlyData = [
-    { name: '2019', revenue: 45000, bookings: 2400 },
-    { name: '2020', revenue: 52000, bookings: 2800 },
-    { name: '2021', revenue: 61000, bookings: 3200 },
-    { name: '2022', revenue: 85000, bookings: 4100 },
-    { name: '2023', revenue: 95000, bookings: 4800 },
+    { name: '2019', revenue: 0, bookings: 0 },
+    { name: '2020', revenue: 0, bookings: 0 },
+    { name: '2021', revenue: 0, bookings: 0 },
+    { name: '2022', revenue: 0, bookings: 0 },
+    { name: '2023', revenue: 0, bookings: 0 },
   ];
 
   const handleDownload = () => {

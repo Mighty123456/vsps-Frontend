@@ -68,7 +68,23 @@ const DocumentViewer = ({ documentUrl, documentType, onClose }) => {
   // Determine file type from URL
   const fileExtension = documentUrl.split('.').pop().toLowerCase();
   const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension);
-  const isPdf = fileExtension === 'pdf';
+  
+  console.log('Viewing document:', { documentUrl, documentType, fileExtension });
+  
+  // For non-image files, directly open in default application
+  if (!isImage) {
+    // Open in a new tab instead of using window.open directly
+    const link = document.createElement('a');
+    link.href = documentUrl;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    onClose(); // Close the modal after opening the document
+    return null;
+  }
   
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
@@ -76,14 +92,20 @@ const DocumentViewer = ({ documentUrl, documentType, onClose }) => {
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-xl font-medium">{documentType} Viewer</h3>
           <div className="flex space-x-2">
-            <a 
-              href={documentUrl} 
-              target="_blank" 
-              rel="noopener noreferrer"
+            <button 
+              onClick={() => {
+                const link = document.createElement('a');
+                link.href = documentUrl;
+                link.target = '_blank';
+                link.rel = 'noopener noreferrer';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+              }}
               className="px-3 py-1 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm"
             >
-              Open in New Tab
-            </a>
+              Open with Default Application
+            </button>
             <button
               onClick={onClose}
               className="text-gray-500 hover:text-gray-700"
@@ -93,33 +115,23 @@ const DocumentViewer = ({ documentUrl, documentType, onClose }) => {
           </div>
         </div>
         <div className="flex-1 overflow-hidden">
-          {isImage ? (
-            <div className="w-full h-full flex items-center justify-center bg-gray-100">
-              <img 
-                src={documentUrl} 
-                alt={documentType} 
-                className="max-w-full max-h-[80vh] object-contain"
-              />
-            </div>
-          ) : isPdf ? (
-            <iframe
-              src={`${documentUrl}#toolbar=1&navpanes=1&scrollbar=1`}
-              className="w-full h-[80vh] border-0"
-              title={`${documentType} PDF`}
+          <div className="w-full h-full flex items-center justify-center bg-gray-100">
+            <img 
+              src={documentUrl} 
+              alt={documentType} 
+              className="max-w-full max-h-[80vh] object-contain"
+              onError={(e) => {
+                console.error('Error loading image:', e);
+                e.target.style.display = 'none';
+                e.target.parentElement.innerHTML = `
+                  <div class="text-center p-4">
+                    <p class="text-red-500 mb-2">Error loading image</p>
+                    <a href="${documentUrl}" target="_blank" class="text-indigo-600 hover:underline">Open in new tab</a>
+                  </div>
+                `;
+              }}
             />
-          ) : (
-            <div className="w-full h-full flex flex-col items-center justify-center bg-gray-100">
-              <p className="text-gray-500 mb-4">This file type cannot be previewed directly.</p>
-              <a 
-                href={documentUrl} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
-              >
-                Open {documentType}
-              </a>
-            </div>
-          )}
+          </div>
         </div>
       </div>
     </div>
@@ -187,15 +199,27 @@ const BookingManagement = () => {
 
   const handleRejectionSubmit = async (reason) => {
     try {
-      await axios.put(`/api/bookings/reject/${rejectionBookingId}`, { 
+      if (!reason.trim()) {
+        showNotification('Please provide a reason for rejection', 'error');
+        return;
+      }
+      
+      const response = await axios.put(`/api/bookings/reject/${rejectionBookingId}`, { 
         bookingId: rejectionBookingId, 
         rejectionReason: reason 
       });
-      showNotification('Booking rejected successfully');
-      fetchBookings();
+      
+      if (response.data) {
+        showNotification('Booking rejected successfully');
+        fetchBookings();
+      }
     } catch (error) {
       console.error('Error rejecting booking:', error);
-      showNotification('Failed to reject booking', 'error');
+      const errorMessage = error.response?.data?.message || 'Failed to reject booking. Please try again.';
+      showNotification(errorMessage, 'error');
+    } finally {
+      setShowRejectionModal(false);
+      setRejectionBookingId(null);
     }
   };
 
@@ -269,9 +293,20 @@ const BookingManagement = () => {
   };
 
   const handleViewDocument = (documentUrl, documentType) => {
-    setSelectedDocument(documentUrl);
-    setSelectedDocumentType(documentType || 'Document');
-    setShowDocumentViewer(true);
+    console.log('Viewing document:', { documentUrl, documentType });
+    
+    // Ensure the URL is properly formatted
+    const formattedUrl = documentUrl.startsWith('http') 
+      ? documentUrl 
+      : `http://localhost:3000${documentUrl.startsWith('/') ? '' : '/'}${documentUrl}`;
+    
+    console.log('Formatted URL:', formattedUrl);
+    
+    // Prevent default behavior and page refresh
+    event.preventDefault();
+    
+    // Open the document in a new tab
+    window.open(formattedUrl, '_blank');
   };
 
   if (loading) {
@@ -555,14 +590,42 @@ const BookingManagement = () => {
                   <div className="space-y-2">
                     <div className="flex items-center space-x-2">
                       <button
-                        onClick={() => handleViewDocument(selectedBooking.eventDocument, selectedBooking.documentType || 'Document')}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          const formattedUrl = selectedBooking.eventDocument.startsWith('http') 
+                            ? selectedBooking.eventDocument 
+                            : `http://localhost:3000${selectedBooking.eventDocument.startsWith('/') ? '' : '/'}${selectedBooking.eventDocument}`;
+                          
+                          // Create a link element and trigger a click
+                          const link = document.createElement('a');
+                          link.href = formattedUrl;
+                          link.target = '_blank';
+                          link.rel = 'noopener noreferrer';
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                        }}
                         className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                       >
                         <DocumentIcon className="h-5 w-5 mr-2" />
                         View Document
                       </button>
                       <button
-                        onClick={() => window.open(selectedBooking.eventDocument, '_blank')}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          const formattedUrl = selectedBooking.eventDocument.startsWith('http') 
+                            ? selectedBooking.eventDocument 
+                            : `http://localhost:3000${selectedBooking.eventDocument.startsWith('/') ? '' : '/'}${selectedBooking.eventDocument}`;
+                          
+                          // Create a link element and trigger a click
+                          const link = document.createElement('a');
+                          link.href = formattedUrl;
+                          link.target = '_blank';
+                          link.rel = 'noopener noreferrer';
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                        }}
                         className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                       >
                         <ArrowDownTrayIcon className="h-5 w-5 mr-2" />
