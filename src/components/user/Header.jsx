@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { FaVideo, FaUser, FaBars, FaTimes } from 'react-icons/fa';
+import { FaVideo, FaUser, FaBars, FaTimes, FaBell } from 'react-icons/fa';
 
 function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState(null);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [notifications, setNotifications] = useState([]);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -15,6 +16,21 @@ function Header() {
     const token = localStorage.getItem('token');
     setIsLoggedIn(!!token);
   }, [location.pathname]);
+
+  // Calculate unread notifications count
+  const unreadNotificationsCount = notifications.filter(n => !n.read).length;
+
+  const handleNotificationClick = (notificationId) => {
+    setNotifications(notifications.map(notification => 
+      notification.id === notificationId 
+        ? { ...notification, read: true }
+        : notification
+    ));
+  };
+
+  const markAllAsRead = () => {
+    setNotifications(notifications.map(notification => ({ ...notification, read: true })));
+  };
 
   const navigationItems = [
     {
@@ -154,6 +170,21 @@ function Header() {
                   <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50">
                     <div className="py-1">
                       <Link
+                        to="/notifications"
+                        className="flex px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-600 items-center justify-between"
+                        onClick={() => setIsProfileDropdownOpen(false)}
+                      >
+                        <span className="flex items-center">
+                          <FaBell className="mr-2" />
+                          Notifications
+                        </span>
+                        {unreadNotificationsCount > 0 && (
+                          <span className="bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                            {unreadNotificationsCount}
+                          </span>
+                        )}
+                      </Link>
+                      <Link
                         to="/profile-settings"
                         className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-600"
                         onClick={() => setIsProfileDropdownOpen(false)}
@@ -200,6 +231,28 @@ function Header() {
         {/* Mobile Menu */}
         {isMenuOpen && (
           <nav className="md:hidden py-4 border-t border-white/10">
+            {/* Notifications Section for Mobile */}
+            {isLoggedIn && (
+              <div className="px-2 py-2">
+                <div className="font-medium mb-2">Notifications</div>
+                <div className="ml-4 space-y-2">
+                  {notifications.map((notification) => (
+                    <div
+                      key={notification.id}
+                      className={`p-3 rounded-lg ${
+                        notification.read ? 'bg-white/5' : 'bg-white/10'
+                      }`}
+                      onClick={() => handleNotificationClick(notification.id)}
+                    >
+                      <p className="text-sm text-white/90">{notification.message}</p>
+                      <p className="text-xs text-white/60 mt-1">{notification.time}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Existing mobile menu items */}
             {navigationItems.map((item, index) => (
               <div key={index} className="px-2">
                 {item.dropdown ? (
@@ -233,6 +286,13 @@ function Header() {
             <div className="px-2 pt-4">
               {isLoggedIn ? (
                 <div className="space-y-2">
+                  <Link
+                    to="/notifications"
+                    className="block text-center px-4 py-2 bg-white/10 rounded-full hover:bg-white/20 transition-colors"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    Notifications
+                  </Link>
                   <Link
                     to="/profile-settings"
                     className="block text-center px-4 py-2 bg-white/10 rounded-full hover:bg-white/20 transition-colors"

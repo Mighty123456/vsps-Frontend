@@ -103,23 +103,17 @@ function Gallery() {
             onClick={(e) => e.stopPropagation()}
           >
             <img
-              src={`${import.meta.env.VITE_API_URL}${selectedImage.type === 'photo' ? selectedImage.url : selectedImage.thumbnail}`}
+              src={item.type === 'photo' ? item.url : item.thumbnail}
               alt={selectedImage.title}
               className="w-full h-auto max-h-[90vh] object-contain mx-auto"
             />
             
             {/* Image details */}
             <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-75 text-white p-4">
-              <h3 className="text-xl font-semibold mb-2">{selectedImage.title}</h3>
-              <p className="text-sm text-gray-300">{selectedImage.description}</p>
               <div className="flex items-center justify-between mt-2">
                 <span className="text-sm font-medium capitalize">
                   {selectedImage.category}
                 </span>
-                <div className="flex items-center space-x-2">
-                  <FaHeart className="text-red-500" />
-                  <span>{selectedImage.likes}</span>
-                </div>
               </div>
             </div>
           </div>
@@ -218,7 +212,7 @@ function Gallery() {
               >
                 <div className="relative">
                   <img
-                    src={`${import.meta.env.VITE_API_URL}${item.type === 'photo' ? item.url : item.thumbnail}`}
+                    src={item.type === 'photo' ? item.url : item.thumbnail}
                     alt={item.title}
                     className="w-full h-64 object-cover transition-transform hover:scale-105 duration-300"
                     onError={(e) => {
@@ -234,17 +228,11 @@ function Gallery() {
                     </div>
                   )}
                 </div>
-                <div className="p-6">
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">{item.title}</h3>
-                  <p className="text-gray-600 mb-4">{item.description}</p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-purple-600 font-medium capitalize">
+                <div className="p-4">
+                  <div className="flex justify-between items-center mt-2">
+                    <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded-full">
                       {item.category}
                     </span>
-                    <div className="flex items-center space-x-1 text-gray-500">
-                      <FaHeart className="text-red-500" />
-                      <span>{item.likes}</span>
-                    </div>
                   </div>
                 </div>
               </div>

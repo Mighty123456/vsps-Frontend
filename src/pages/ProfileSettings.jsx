@@ -75,11 +75,11 @@ function ProfileSettings() {
       
       try {
         const formData = new FormData();
-        formData.append('profileImage', file);
+        formData.append('image', file);
         
         const token = localStorage.getItem('token');
-        const response = await axios.post(
-          'http://localhost:3000/api/users/profile/image',
+        const response = await axios.put(
+          `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/users/profile-image`,
           formData,
           {
             headers: {
@@ -95,7 +95,7 @@ function ProfileSettings() {
         }
       } catch (err) {
         console.error('Image upload error:', err);
-        alert('Failed to upload image');
+        alert(err.response?.data?.message || 'Failed to upload image');
       }
     }
   };

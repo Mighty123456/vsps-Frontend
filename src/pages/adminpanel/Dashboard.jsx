@@ -6,7 +6,8 @@ import {
   CurrencyDollarIcon 
 } from '@heroicons/react/24/outline';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import axios from 'axios';
+import axiosInstance from '../../utils/axiosConfig';
+import { useNavigate } from 'react-router-dom';
 
 const data = [
   { name: 'Jan', value: 0 },
@@ -26,6 +27,7 @@ const Dashboard = () => {
   ]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchDashboardStats();
@@ -35,15 +37,11 @@ const Dashboard = () => {
     try {
       const token = localStorage.getItem('token');
       if (!token) {
-        throw new Error('No authentication token found');
+        navigate('/auth');
+        return;
       }
 
-      const response = await axios.get('/api/users/dashboard-stats', {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
-
+      const response = await axiosInstance.get('/api/users/dashboard-stats');
       const { totalUsers, totalBookings, activeStreams, totalRevenue } = response.data;
 
       setStats([
@@ -56,7 +54,14 @@ const Dashboard = () => {
       setLoading(false);
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
-      setError('Failed to load dashboard statistics');
+      
+      if (error.response && error.response.status === 401) {
+        // Token is invalid or expired
+        localStorage.removeItem('token');
+        navigate('/auth');
+      } else {
+        setError('Failed to load dashboard statistics');
+      }
       setLoading(false);
     }
   };

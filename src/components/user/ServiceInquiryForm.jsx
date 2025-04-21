@@ -1,7 +1,11 @@
 import { useState } from 'react';
 import { FaUser, FaEnvelope, FaPhone, FaCalendarAlt } from 'react-icons/fa';
+import { useAuth } from '../../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 function ServiceInquiryForm({ serviceName, onClose }) {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -31,6 +35,39 @@ function ServiceInquiryForm({ serviceName, onClose }) {
       onClose();
     }, 2000);
   };
+
+  // If user is not authenticated, show login prompt
+  if (!user) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-xl p-8 max-w-md w-full m-4">
+          <h2 className="text-2xl font-bold text-gray-900 mb-6">
+            Login Required
+          </h2>
+          <p className="text-gray-600 mb-6">
+            Please log in to submit an inquiry for {serviceName}.
+          </p>
+          <div className="flex space-x-4">
+            <button
+              onClick={() => {
+                onClose();
+                navigate('/auth');
+              }}
+              className="flex-1 bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 transition-colors"
+            >
+              Login
+            </button>
+            <button
+              onClick={onClose}
+              className="flex-1 bg-gray-200 text-gray-800 py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">

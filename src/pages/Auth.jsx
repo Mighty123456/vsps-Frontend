@@ -102,16 +102,24 @@ function Auth() {
             if (decodedToken.role === 'admin') {
               window.location.href = '/admin/dashboard';
             } else {
-              // Check if there's a stored booking date
-              const selectedBookingDate = localStorage.getItem('selectedBookingDate');
-              if (selectedBookingDate) {
-                // Clear the stored date
-                localStorage.removeItem('selectedBookingDate');
-                // Redirect to booking page
-                navigate('/booking');
+              // Check for redirect path
+              const redirectPath = localStorage.getItem('redirectAfterLogin');
+              if (redirectPath) {
+                localStorage.removeItem('redirectAfterLogin');
+                // Force a page reload when redirecting back to booking
+                window.location.href = redirectPath;
               } else {
-                // Force a page reload to update authentication state
-                window.location.href = '/';
+                // Check if there's a stored booking date
+                const selectedBookingDate = localStorage.getItem('selectedBookingDate');
+                if (selectedBookingDate) {
+                  // Clear the stored date
+                  localStorage.removeItem('selectedBookingDate');
+                  // Redirect to booking page
+                  navigate('/booking');
+                } else {
+                  // Force a page reload to update authentication state
+                  window.location.href = '/';
+                }
               }
             }
           } catch (error) {

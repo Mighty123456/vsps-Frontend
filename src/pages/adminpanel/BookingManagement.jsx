@@ -152,6 +152,7 @@ const BookingManagement = () => {
   const [showDocumentViewer, setShowDocumentViewer] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [selectedDocumentType, setSelectedDocumentType] = useState('Document');
+  const [activeCategory, setActiveCategory] = useState('all');
 
   useEffect(() => {
     fetchBookings();
@@ -309,6 +310,14 @@ const BookingManagement = () => {
     window.open(formattedUrl, '_blank');
   };
 
+  // Filter bookings based on active category
+  const filteredBookings = bookings.filter(booking => {
+    if (activeCategory === 'all') return true;
+    if (activeCategory === 'samuh-lagan') return booking.eventType === 'Samuh Lagan';
+    if (activeCategory === 'tejasvitala') return booking.eventType === 'Tejasvitala Registration';
+    return true;
+  });
+
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
@@ -364,9 +373,43 @@ const BookingManagement = () => {
             Total Bookings: {bookings.length}
           </div>
         </div>
+        
+        {/* Category Tabs */}
+        <div className="mt-4 flex space-x-4">
+          <button
+            onClick={() => setActiveCategory('all')}
+            className={`px-4 py-2 rounded-lg ${
+              activeCategory === 'all' 
+                ? 'bg-purple-600 text-white' 
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            All Bookings
+          </button>
+          <button
+            onClick={() => setActiveCategory('samuh-lagan')}
+            className={`px-4 py-2 rounded-lg ${
+              activeCategory === 'samuh-lagan' 
+                ? 'bg-purple-600 text-white' 
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            Samuh Lagan
+          </button>
+          <button
+            onClick={() => setActiveCategory('tejasvitala')}
+            className={`px-4 py-2 rounded-lg ${
+              activeCategory === 'tejasvitala' 
+                ? 'bg-purple-600 text-white' 
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            Tejasvitala Registration
+          </button>
+        </div>
       </div>
 
-      {bookings.length === 0 ? (
+      {filteredBookings.length === 0 ? (
         <div className="text-center py-8 text-gray-500">
           No bookings found
         </div>
@@ -384,7 +427,7 @@ const BookingManagement = () => {
               </tr>
             </thead>
             <tbody>
-              {bookings.map((booking) => (
+              {filteredBookings.map((booking) => (
                 <tr key={booking._id} className="border-b hover:bg-gray-50">
                   <td className="py-4 px-2">{booking.name}</td>
                   <td className="py-4 px-2">{booking.eventType}</td>

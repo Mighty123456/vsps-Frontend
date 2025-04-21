@@ -1,4 +1,7 @@
 import { useState, useEffect } from 'react';
+import axiosInstance from '../../utils/axiosConfig';
+import { useNavigate } from 'react-router-dom';
+import { CheckCircleIcon, XCircleIcon, ExclamationCircleIcon, XMarkIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 
 const Users = () => {
   const [users, setUsers] = useState([]);
@@ -11,37 +14,61 @@ const Users = () => {
     role: '',
     isVerified: false
   });
-  const [notification, setNotification] = useState({ show: false, message: '', type: '' });
+  const [notifications, setNotifications] = useState([]);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchUsers();
   }, []);
 
+  // Function to show notification
+  const showNotification = (message, type = 'error', action = null, actionLabel = '') => {
+    const id = Date.now().toString();
+    
+    // Add new notification to state
+    setNotifications(prev => [
+      ...prev,
+      {
+        id,
+        message,
+        type,
+        action,
+        actionLabel
+      }
+    ]);
+    
+    // Auto-close after 5 seconds
+    setTimeout(() => {
+      closeNotification(id);
+    }, 5000);
+  };
+  
+  // Function to close notification
+  const closeNotification = (id) => {
+    setNotifications(prev => prev.filter(notification => notification.id !== id));
+  };
+
   const fetchUsers = async () => {
     try {
       const token = localStorage.getItem('token');
       if (!token) {
-        throw new Error('No authentication token found');
+        navigate('/auth');
+        return;
       }
 
-      const response = await fetch('http://localhost:3000/api/users/all', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      setUsers(data);
+      const response = await axiosInstance.get('/api/users/all');
+      setUsers(response.data);
       setLoading(false);
     } catch (error) {
-      setError(error.message || 'Failed to load users. Please try again later.');
+      console.error('Error fetching users:', error);
+      
+      if (error.response && error.response.status === 401) {
+        // Token is invalid or expired
+        localStorage.removeItem('token');
+        navigate('/auth');
+      } else {
+        setError(error.response?.data?.message || 'Failed to load users. Please try again later.');
+      }
       setLoading(false);
     }
   };
@@ -68,24 +95,24 @@ const Users = () => {
         return;
       }
 
-      const response = await fetch(`http://localhost:3000/api/users/${userId}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      await axiosInstance.delete(`/api/users/${userId}`);
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to delete user');
-      }
-
+      // If we get here, the request was successful
       setUsers(users.filter(user => user._id !== userId));
-      showNotification('User deleted successfully', 'success');
+      showNotification(
+        'User deleted successfully', 
+        'success', 
+        () => fetchUsers(), 
+        'Refresh List'
+      );
     } catch (error) {
-      setError(error.message || 'Failed to delete user');
+      console.error('Error deleting user:', error);
+      showNotification(
+        error.response?.data?.message || error.message || 'Failed to delete user', 
+        'error',
+        () => fetchUsers(),
+        'Try Again'
+      );
     }
   };
 
@@ -99,34 +126,31 @@ const Users = () => {
         return;
       }
 
-      const response = await fetch(`http://localhost:3000/api/users/${editingUser._id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(editForm)
-      });
+      const response = await axiosInstance.put(`/api/users/${editingUser._id}`, editForm);
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to update user');
-      }
+      // Axios automatically throws an error for non-2xx responses
+      // If we get here, the request was successful
+      const data = response.data;
 
       setUsers(users.map(user => 
         user._id === editingUser._id ? data.user : user
       ));
       setEditingUser(null);
-      showNotification('User updated successfully', 'success');
+      showNotification(
+        'User updated successfully', 
+        'success', 
+        () => fetchUsers(), 
+        'Refresh Users'
+      );
     } catch (error) {
-      setError(error.message || 'Failed to update user');
+      console.error('Error updating user:', error);
+      showNotification(
+        error.response?.data?.message || error.message || 'Failed to update user', 
+        'error',
+        () => setEditingUser(null),
+        'Close Form'
+      );
     }
-  };
-
-  const showNotification = (message, type = 'error') => {
-    setNotification({ show: true, message, type });
-    setTimeout(() => setNotification({ show: false, message: '', type: '' }), 5000);
   };
 
   if (loading) {
@@ -156,6 +180,77 @@ const Users = () => {
 
   return (
     <div className="space-y-6">
+      {/* Notifications Container */}
+      <div className="fixed top-5 right-5 z-50 max-w-md w-full">
+        {notifications.map(notification => {
+          const bgColor = notification.type === 'success' ? 'bg-green-50' : notification.type === 'error' ? 'bg-red-50' : 'bg-yellow-50';
+          const borderColor = notification.type === 'success' ? 'border-green-500' : notification.type === 'error' ? 'border-red-500' : 'border-yellow-500';
+          const textColor = notification.type === 'success' ? 'text-green-800' : notification.type === 'error' ? 'text-red-800' : 'text-yellow-800';
+          const iconColor = notification.type === 'success' ? 'text-green-600' : notification.type === 'error' ? 'text-red-600' : 'text-yellow-600';
+          const buttonBg = notification.type === 'success' ? 'bg-green-600 hover:bg-green-700' : notification.type === 'error' ? 'bg-red-600 hover:bg-red-700' : 'bg-yellow-600 hover:bg-yellow-700';
+          
+          return (
+            <div 
+              key={notification.id}
+              className={`p-4 rounded-lg shadow-xl ${bgColor} border-l-4 ${borderColor} mb-3 transform transition-all duration-300 ease-in-out translate-x-0 opacity-100`}
+            >
+              <div className="flex items-start">
+                <div className="flex-shrink-0">
+                  <div className={`rounded-full ${bgColor.replace('bg-', 'bg-').replace('-50', '-100')} p-1`}>
+                    {notification.type === 'success' ? (
+                      <CheckCircleIcon className={`h-5 w-5 ${iconColor}`} />
+                    ) : notification.type === 'error' ? (
+                      <XCircleIcon className={`h-5 w-5 ${iconColor}`} />
+                    ) : (
+                      <ExclamationCircleIcon className={`h-5 w-5 ${iconColor}`} />
+                    )}
+                  </div>
+                </div>
+                <div className="ml-3 w-0 flex-1 pt-0.5">
+                  <p className={`text-sm font-medium ${textColor}`}>
+                    {notification.message}
+                  </p>
+                  <p className="mt-1 text-xs text-gray-500">
+                    {notification.type === 'success' ? 'Operation completed successfully' : 'Please try again or contact support'}
+                  </p>
+                  {notification.action && notification.actionLabel && (
+                    <div className="mt-3 flex space-x-2">
+                      <button
+                        type="button"
+                        className={`inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md shadow-sm text-white ${buttonBg}`}
+                        onClick={() => {
+                          notification.action();
+                          closeNotification(notification.id);
+                        }}
+                      >
+                        {notification.actionLabel === 'Refresh List' || notification.actionLabel === 'Refresh Users' ? (
+                          <>
+                            <ArrowPathIcon className="h-4 w-4 mr-1" />
+                            {notification.actionLabel}
+                          </>
+                        ) : (
+                          notification.actionLabel
+                        )}
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <div className="ml-4 flex-shrink-0 flex">
+                  <button
+                    type="button"
+                    className="bg-transparent rounded-md inline-flex text-gray-400 hover:text-gray-500 focus:outline-none"
+                    onClick={() => closeNotification(notification.id)}
+                  >
+                    <span className="sr-only">Close</span>
+                    <XMarkIcon className="h-5 w-5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
       <div className="sm:flex sm:items-center">
         <div className="sm:flex-auto">
           <h1 className="text-xl font-semibold text-gray-900">Users</h1>
@@ -163,18 +258,10 @@ const Users = () => {
             A list of all users in your application
           </p>
         </div>
-        <div className="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
-          <button
-            type="button"
-            className="inline-flex items-center justify-center rounded-md border border-transparent bg-purple-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-purple-600 transition-colors duration-200"
-          >
-            Add User
-          </button>
-        </div>
       </div>
 
       {editingUser && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center">
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
             <h2 className="text-xl font-semibold mb-4">Edit User</h2>
             <form onSubmit={handleUpdate} className="space-y-4">
@@ -297,14 +384,6 @@ const Users = () => {
           </table>
         )}
       </div>
-
-      {notification.show && (
-        <div className={`fixed top-4 right-4 p-4 rounded-md ${
-          notification.type === 'error' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
-        }`}>
-          {notification.message}
-        </div>
-      )}
     </div>
   );
 };
