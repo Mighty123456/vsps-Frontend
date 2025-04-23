@@ -6,7 +6,8 @@ export const createFormNotification = async (formType, message) => {
   try {
     const token = localStorage.getItem('token');
     if (!token) {
-      throw new Error('No authentication token found');
+      console.log('User not authenticated, skipping notification creation');
+      return null;
     }
 
     const response = await axios.post(
@@ -28,7 +29,8 @@ export const createFormNotification = async (formType, message) => {
     return response.data;
   } catch (error) {
     console.error('Error creating notification:', error);
-    throw error;
+    // Don't throw the error, just return null
+    return null;
   }
 };
 
@@ -36,7 +38,8 @@ export const getNotifications = async () => {
   try {
     const token = localStorage.getItem('token');
     if (!token) {
-      throw new Error('No authentication token found');
+      console.log('User not authenticated, returning empty notifications');
+      return [];
     }
 
     console.log('Fetching notifications from:', `${API_URL}/api/notifications`);
@@ -69,6 +72,7 @@ export const getNotifications = async () => {
     if (error.response) {
       console.error('API Error Response:', error.response.data);
     }
-    throw error;
+    // Return empty array instead of throwing error
+    return [];
   }
 }; 

@@ -153,9 +153,13 @@ const BookingManagement = () => {
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [selectedDocumentType, setSelectedDocumentType] = useState('Document');
   const [activeCategory, setActiveCategory] = useState('all');
+  const [samuhLaganRequests, setSamuhLaganRequests] = useState([]);
+  const [studentAwardRequests, setStudentAwardRequests] = useState([]);
 
   useEffect(() => {
     fetchBookings();
+    fetchSamuhLaganRequests();
+    fetchStudentAwardRequests();
   }, []);
 
   const showNotification = (message, type = 'success') => {
@@ -176,6 +180,26 @@ const BookingManagement = () => {
       setBookings([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchSamuhLaganRequests = async () => {
+    try {
+      const response = await axios.get('/api/bookings/samuh-lagan');
+      setSamuhLaganRequests(response.data);
+    } catch (error) {
+      console.error('Error fetching Samuh Lagan requests:', error);
+      showNotification('Failed to fetch Samuh Lagan requests', 'error');
+    }
+  };
+
+  const fetchStudentAwardRequests = async () => {
+    try {
+      const response = await axios.get('/api/bookings/student-awards');
+      setStudentAwardRequests(response.data);
+    } catch (error) {
+      console.error('Error fetching Student Award requests:', error);
+      showNotification('Failed to fetch Student Award requests', 'error');
     }
   };
 
@@ -256,10 +280,25 @@ const BookingManagement = () => {
     setEditedData({ ...selectedBooking });
   };
 
-  const handleViewBooking = (booking) => {
-    setSelectedBooking(booking);
-    setIsEditing(false);
-    setEditedData(null);
+  const handleViewBooking = async (booking) => {
+    try {
+      if (booking.eventType === 'Samuh Lagan') {
+        // Fetch detailed Samuh Lagan data
+        const response = await axios.get(`/api/bookings/samuh-lagan/${booking._id}`);
+        if (response.data) {
+          setSelectedBooking(response.data);
+        } else {
+          showNotification('Failed to fetch Samuh Lagan details', 'error');
+        }
+      } else {
+        setSelectedBooking(booking);
+      }
+      setIsEditing(false);
+      setEditedData(null);
+    } catch (error) {
+      console.error('Error fetching booking details:', error);
+      showNotification('Failed to fetch booking details', 'error');
+    }
   };
 
   const handleSave = async () => {
@@ -280,11 +319,17 @@ const BookingManagement = () => {
 
       console.log('Sending data:', formattedData); // Debug log
 
-      const response = await axios.put(`/api/bookings/update/${editedData._id}`, formattedData);
+      let response;
+      if (editedData.eventType === 'Samuh Lagan') {
+        response = await axios.put(`/api/bookings/samuh-lagan/update/${editedData._id}`, formattedData);
+      } else {
+        response = await axios.put(`/api/bookings/update/${editedData._id}`, formattedData);
+      }
+
       if (response.data) {
         showNotification('Booking updated successfully');
         setIsEditing(false);
-        setSelectedBooking(response.data.booking);
+        setSelectedBooking(response.data.booking || response.data);
         fetchBookings();
       }
     } catch (error) {
@@ -310,11 +355,123 @@ const BookingManagement = () => {
     window.open(formattedUrl, '_blank');
   };
 
+  const handleApproveSamuhLagan = async (id) => {
+    try {
+      await axios.put(`/api/bookings/samuh-lagan/approve/${id}`);
+      showNotification('Samuh Lagan request approved successfully');
+      fetchSamuhLaganRequests();
+    } catch (error) {
+      console.error('Error approving Samuh Lagan request:', error);
+      showNotification('Failed to approve Samuh Lagan request', 'error');
+    }
+  };
+
+  const handleRejectSamuhLagan = async (id) => {
+    setRejectionBookingId(id);
+    setShowRejectionModal(true);
+  };
+
+  const handleRejectionSubmitSamuhLagan = async (reason) => {
+    try {
+      if (!reason.trim()) {
+        showNotification('Please provide a reason for rejection', 'error');
+        return;
+      }
+      
+      const response = await axios.put(`/api/bookings/samuh-lagan/reject/${rejectionBookingId}`, { 
+        rejectionReason: reason 
+      });
+      
+      if (response.data) {
+        showNotification('Samuh Lagan request rejected successfully');
+        fetchSamuhLaganRequests();
+      }
+    } catch (error) {
+      console.error('Error rejecting Samuh Lagan request:', error);
+      showNotification('Failed to reject Samuh Lagan request', 'error');
+    } finally {
+      setShowRejectionModal(false);
+      setRejectionBookingId(null);
+    }
+  };
+
+  const handleConfirmSamuhLagan = async (id) => {
+    try {
+      await axios.put(`/api/bookings/samuh-lagan/confirm/${id}`);
+      showNotification('Samuh Lagan request confirmed successfully');
+      fetchSamuhLaganRequests();
+    } catch (error) {
+      console.error('Error confirming Samuh Lagan request:', error);
+      showNotification('Failed to confirm Samuh Lagan request', 'error');
+    }
+  };
+
+  const handleFileUpload = async (files, type) => {
+    try {
+      const formData = new FormData();
+      Array.from(files).forEach(file => {
+        formData.append(type, file);
+      });
+
+      const response = await axios.post('/api/bookings/upload-document', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      return response.data.documentUrl;
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      showNotification('Failed to upload file', 'error');
+      return null;
+    }
+  };
+
+  const handleApproveStudentAward = async (id) => {
+    try {
+      await axios.put(`/api/bookings/student-awards/approve/${id}`);
+      showNotification('Student Award request approved successfully');
+      fetchStudentAwardRequests();
+    } catch (error) {
+      console.error('Error approving Student Award request:', error);
+      showNotification('Failed to approve Student Award request', 'error');
+    }
+  };
+
+  const handleRejectStudentAward = async (id) => {
+    setRejectionBookingId(id);
+    setShowRejectionModal(true);
+  };
+
+  const handleRejectionSubmitStudentAward = async (reason) => {
+    try {
+      if (!reason.trim()) {
+        showNotification('Please provide a reason for rejection', 'error');
+        return;
+      }
+      
+      const response = await axios.put(`/api/bookings/student-awards/reject/${rejectionBookingId}`, { 
+        rejectionReason: reason 
+      });
+      
+      if (response.data) {
+        showNotification('Student Award request rejected successfully');
+        fetchStudentAwardRequests();
+      }
+    } catch (error) {
+      console.error('Error rejecting Student Award request:', error);
+      showNotification('Failed to reject Student Award request', 'error');
+    } finally {
+      setShowRejectionModal(false);
+      setRejectionBookingId(null);
+    }
+  };
+
   // Filter bookings based on active category
   const filteredBookings = bookings.filter(booking => {
     if (activeCategory === 'all') return true;
     if (activeCategory === 'samuh-lagan') return booking.eventType === 'Samuh Lagan';
-    if (activeCategory === 'tejasvitala') return booking.eventType === 'Tejasvitala Registration';
+    if (activeCategory === 'student-award') return booking.eventType === 'Student Award Registration';
     return true;
   });
 
@@ -384,7 +541,7 @@ const BookingManagement = () => {
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
-            All Bookings
+            Event Bookings
           </button>
           <button
             onClick={() => setActiveCategory('samuh-lagan')}
@@ -397,85 +554,70 @@ const BookingManagement = () => {
             Samuh Lagan
           </button>
           <button
-            onClick={() => setActiveCategory('tejasvitala')}
+            onClick={() => setActiveCategory('student-award')}
             className={`px-4 py-2 rounded-lg ${
-              activeCategory === 'tejasvitala' 
+              activeCategory === 'student-award' 
                 ? 'bg-purple-600 text-white' 
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
-            Tejasvitala Registration
+            Student Award
           </button>
         </div>
       </div>
 
-      {filteredBookings.length === 0 ? (
-        <div className="text-center py-8 text-gray-500">
-          No bookings found
-        </div>
-      ) : (
+      {activeCategory === 'student-award' ? (
         <div className="overflow-x-auto">
           <table className="w-full min-w-full">
             <thead>
               <tr className="text-left border-b">
-                <th className="py-4 px-2">Customer</th>
-                <th className="py-4 px-2">Service</th>
-                <th className="py-4 px-2">Date</th>
-                <th className="py-4 px-2">Time</th>
+                <th className="py-4 px-2">Student Name</th>
+                <th className="py-4 px-2">School</th>
+                <th className="py-4 px-2">Percentage</th>
+                <th className="py-4 px-2">Rank</th>
                 <th className="py-4 px-2">Status</th>
                 <th className="py-4 px-2">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filteredBookings.map((booking) => (
-                <tr key={booking._id} className="border-b hover:bg-gray-50">
-                  <td className="py-4 px-2">{booking.name}</td>
-                  <td className="py-4 px-2">{booking.eventType}</td>
-                  <td className="py-4 px-2">
-                    {new Date(booking.date).toLocaleDateString()}
-                  </td>
-                  <td className="py-4 px-2">{booking.startTime}</td>
+              {studentAwardRequests.map((request) => (
+                <tr key={request._id} className="border-b hover:bg-gray-50">
+                  <td className="py-4 px-2">{request.name}</td>
+                  <td className="py-4 px-2">{request.schoolName}</td>
+                  <td className="py-4 px-2">{request.totalPercentage}%</td>
+                  <td className="py-4 px-2">{request.rank}</td>
                   <td className="py-4 px-2">
                     <span className={`px-2 py-1 rounded-full text-sm ${
-                      booking.status === 'Booked' ? 'bg-green-100 text-green-800' :
-                      booking.status === 'Approved' ? 'bg-blue-100 text-blue-800' :
-                      booking.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' :
-                      booking.status === 'Rejected' ? 'bg-red-100 text-red-800' :
+                      request.status === 'approved' ? 'bg-green-100 text-green-800' :
+                      request.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                      request.status === 'rejected' ? 'bg-red-100 text-red-800' :
                       'bg-gray-100 text-gray-800'
                     }`}>
-                      {booking.status}
+                      {request.status}
                     </span>
                   </td>
                   <td className="py-4 px-2">
                     <div className="flex space-x-2">
-                      {booking.status === 'Pending' && (
+                      {request.status === 'pending' && (
                         <>
                           <button 
-                            onClick={() => handleApprove(booking._id)} 
+                            onClick={() => handleApproveStudentAward(request._id)} 
                             className="p-2 text-green-600 hover:bg-green-50 rounded"
-                            title="Approve Booking"
+                            title="Approve Request"
                           >
                             <CheckIcon className="h-5 w-5" />
                           </button>
                           <button 
-                            onClick={() => handleReject(booking._id)} 
+                            onClick={() => handleRejectStudentAward(request._id)} 
                             className="p-2 text-red-600 hover:bg-red-50 rounded"
-                            title="Reject Booking"
+                            title="Reject Request"
                           >
                             <XMarkIcon className="h-5 w-5" />
                           </button>
                         </>
                       )}
-                      {booking.status === 'Approved' && (
-                        <button 
-                          onClick={() => handleConfirmBooking(booking._id)}
-                          className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-                        >
-                          Confirm Booking
-                        </button>
-                      )}
                       <button 
-                        onClick={() => handleViewBooking(booking)} 
+                        onClick={() => handleViewBooking(request)} 
                         className="p-2 text-blue-600 hover:bg-blue-50 rounded"
                         title="View Details"
                       >
@@ -488,6 +630,160 @@ const BookingManagement = () => {
             </tbody>
           </table>
         </div>
+      ) : activeCategory === 'samuh-lagan' ? (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-full">
+            <thead>
+              <tr className="text-left border-b">
+                <th className="py-4 px-2">Bride</th>
+                <th className="py-4 px-2">Groom</th>
+                <th className="py-4 px-2">Date</th>
+                <th className="py-4 px-2">Status</th>
+                <th className="py-4 px-2">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {samuhLaganRequests.map((request) => (
+                <tr key={request._id} className="border-b hover:bg-gray-50">
+                  <td className="py-4 px-2">{request.bride.name}</td>
+                  <td className="py-4 px-2">{request.groom.name}</td>
+                  <td className="py-4 px-2">
+                    {new Date(request.ceremonyDate).toLocaleDateString()}
+                  </td>
+                  <td className="py-4 px-2">
+                    <span className={`px-2 py-1 rounded-full text-sm ${
+                      request.status === 'confirmed' ? 'bg-green-100 text-green-800' :
+                      request.status === 'approved' ? 'bg-blue-100 text-blue-800' :
+                      request.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                      request.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {request.status}
+                    </span>
+                  </td>
+                  <td className="py-4 px-2">
+                    <div className="flex space-x-2">
+                      {request.status === 'pending' && (
+                        <>
+                          <button 
+                            onClick={() => handleApproveSamuhLagan(request._id)} 
+                            className="p-2 text-green-600 hover:bg-green-50 rounded"
+                            title="Approve Request"
+                          >
+                            <CheckIcon className="h-5 w-5" />
+                          </button>
+                          <button 
+                            onClick={() => handleRejectSamuhLagan(request._id)} 
+                            className="p-2 text-red-600 hover:bg-red-50 rounded"
+                            title="Reject Request"
+                          >
+                            <XMarkIcon className="h-5 w-5" />
+                          </button>
+                        </>
+                      )}
+                      {request.status === 'approved' && (
+                        <button 
+                          onClick={() => handleConfirmSamuhLagan(request._id)}
+                          className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                        >
+                          Confirm
+                        </button>
+                      )}
+                      <button 
+                        onClick={() => handleViewBooking(request)} 
+                        className="p-2 text-blue-600 hover:bg-blue-50 rounded"
+                        title="View Details"
+                      >
+                        <EyeIcon className="h-5 w-5" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        filteredBookings.length === 0 ? (
+          <div className="text-center py-8 text-gray-500">
+            No bookings found
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-full">
+              <thead>
+                <tr className="text-left border-b">
+                  <th className="py-4 px-2">Customer</th>
+                  <th className="py-4 px-2">Service</th>
+                  <th className="py-4 px-2">Date</th>
+                  <th className="py-4 px-2">Time</th>
+                  <th className="py-4 px-2">Status</th>
+                  <th className="py-4 px-2">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredBookings.map((booking) => (
+                  <tr key={booking._id} className="border-b hover:bg-gray-50">
+                    <td className="py-4 px-2">{booking.name}</td>
+                    <td className="py-4 px-2">{booking.eventType}</td>
+                    <td className="py-4 px-2">
+                      {new Date(booking.date).toLocaleDateString()}
+                    </td>
+                    <td className="py-4 px-2">{booking.startTime}</td>
+                    <td className="py-4 px-2">
+                      <span className={`px-2 py-1 rounded-full text-sm ${
+                        booking.status === 'Booked' ? 'bg-green-100 text-green-800' :
+                        booking.status === 'Approved' ? 'bg-blue-100 text-blue-800' :
+                        booking.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' :
+                        booking.status === 'Rejected' ? 'bg-red-100 text-red-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {booking.status}
+                      </span>
+                    </td>
+                    <td className="py-4 px-2">
+                      <div className="flex space-x-2">
+                        {booking.status === 'Pending' && (
+                          <>
+                            <button 
+                              onClick={() => handleApprove(booking._id)} 
+                              className="p-2 text-green-600 hover:bg-green-50 rounded"
+                              title="Approve Booking"
+                            >
+                              <CheckIcon className="h-5 w-5" />
+                            </button>
+                            <button 
+                              onClick={() => handleReject(booking._id)} 
+                              className="p-2 text-red-600 hover:bg-red-50 rounded"
+                              title="Reject Booking"
+                            >
+                              <XMarkIcon className="h-5 w-5" />
+                            </button>
+                          </>
+                        )}
+                        {booking.status === 'Approved' && (
+                          <button 
+                            onClick={() => handleConfirmBooking(booking._id)}
+                            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                          >
+                            Confirm Booking
+                          </button>
+                        )}
+                        <button 
+                          onClick={() => handleViewBooking(booking)} 
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded"
+                          title="View Details"
+                        >
+                          <EyeIcon className="h-5 w-5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
       )}
 
       {selectedBooking && (
@@ -726,6 +1022,372 @@ const BookingManagement = () => {
                   <p className="mt-1">{selectedBooking.additionalNotes}</p>
                 )}
               </div>
+
+              {/* Only show bride and groom sections for Samuh Lagan bookings */}
+              {selectedBooking.eventType === 'Samuh Lagan' && selectedBooking.bride && selectedBooking.groom && (
+                <>
+                  <div className="border-b pb-4">
+                    <h3 className="text-lg font-medium mb-4">Bride Information</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Name</label>
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={editedData.bride?.name || ''}
+                            onChange={(e) => setEditedData({
+                              ...editedData,
+                              bride: { ...editedData.bride, name: e.target.value }
+                            })}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                          />
+                        ) : (
+                          <p className="mt-1">{selectedBooking.bride?.name}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Father's Name</label>
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={editedData.bride?.fatherName || ''}
+                            onChange={(e) => setEditedData({
+                              ...editedData,
+                              bride: { ...editedData.bride, fatherName: e.target.value }
+                            })}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                          />
+                        ) : (
+                          <p className="mt-1">{selectedBooking.bride?.fatherName}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Mother's Name</label>
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={editedData.bride?.motherName || ''}
+                            onChange={(e) => setEditedData({
+                              ...editedData,
+                              bride: { ...editedData.bride, motherName: e.target.value }
+                            })}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                          />
+                        ) : (
+                          <p className="mt-1">{selectedBooking.bride?.motherName}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Age</label>
+                        {isEditing ? (
+                          <input
+                            type="number"
+                            value={editedData.bride?.age || ''}
+                            onChange={(e) => setEditedData({
+                              ...editedData,
+                              bride: { ...editedData.bride, age: e.target.value }
+                            })}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                          />
+                        ) : (
+                          <p className="mt-1">{selectedBooking.bride?.age}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Contact Number</label>
+                        {isEditing ? (
+                          <input
+                            type="tel"
+                            value={editedData.bride?.contactNumber || ''}
+                            onChange={(e) => setEditedData({
+                              ...editedData,
+                              bride: { ...editedData.bride, contactNumber: e.target.value }
+                            })}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                          />
+                        ) : (
+                          <p className="mt-1">{selectedBooking.bride?.contactNumber}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Email</label>
+                        {isEditing ? (
+                          <input
+                            type="email"
+                            value={editedData.bride?.email || ''}
+                            onChange={(e) => setEditedData({
+                              ...editedData,
+                              bride: { ...editedData.bride, email: e.target.value }
+                            })}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                          />
+                        ) : (
+                          <p className="mt-1">{selectedBooking.bride?.email}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Address</label>
+                        {isEditing ? (
+                          <textarea
+                            value={editedData.bride?.address || ''}
+                            onChange={(e) => setEditedData({
+                              ...editedData,
+                              bride: { ...editedData.bride, address: e.target.value }
+                            })}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                            rows="3"
+                          />
+                        ) : (
+                          <p className="mt-1">{selectedBooking.bride?.address}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Photo</label>
+                        {selectedBooking.bride?.photo ? (
+                          <div className="mt-2">
+                            <img 
+                              src={selectedBooking.bride.photo} 
+                              alt="Bride" 
+                              className="h-32 w-32 object-cover rounded-lg"
+                            />
+                          </div>
+                        ) : (
+                          <p className="mt-1 text-gray-500">No photo uploaded</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Documents</label>
+                        {selectedBooking.bride?.documents && selectedBooking.bride.documents.length > 0 ? (
+                          <div className="mt-2 space-y-2">
+                            {selectedBooking.bride.documents.map((doc, index) => (
+                              <div key={index} className="flex items-center space-x-2">
+                                <DocumentIcon className="h-5 w-5 text-gray-400" />
+                                <a 
+                                  href={doc} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 hover:underline"
+                                >
+                                  Document {index + 1}
+                                </a>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="mt-1 text-gray-500">No documents uploaded</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="border-b pb-4">
+                    <h3 className="text-lg font-medium mb-4">Groom Information</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Name</label>
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={editedData.groom?.name || ''}
+                            onChange={(e) => setEditedData({
+                              ...editedData,
+                              groom: { ...editedData.groom, name: e.target.value }
+                            })}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                          />
+                        ) : (
+                          <p className="mt-1">{selectedBooking.groom?.name}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Father's Name</label>
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={editedData.groom?.fatherName || ''}
+                            onChange={(e) => setEditedData({
+                              ...editedData,
+                              groom: { ...editedData.groom, fatherName: e.target.value }
+                            })}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                          />
+                        ) : (
+                          <p className="mt-1">{selectedBooking.groom?.fatherName}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Mother's Name</label>
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={editedData.groom?.motherName || ''}
+                            onChange={(e) => setEditedData({
+                              ...editedData,
+                              groom: { ...editedData.groom, motherName: e.target.value }
+                            })}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                          />
+                        ) : (
+                          <p className="mt-1">{selectedBooking.groom?.motherName}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Age</label>
+                        {isEditing ? (
+                          <input
+                            type="number"
+                            value={editedData.groom?.age || ''}
+                            onChange={(e) => setEditedData({
+                              ...editedData,
+                              groom: { ...editedData.groom, age: e.target.value }
+                            })}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                          />
+                        ) : (
+                          <p className="mt-1">{selectedBooking.groom?.age}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Contact Number</label>
+                        {isEditing ? (
+                          <input
+                            type="tel"
+                            value={editedData.groom?.contactNumber || ''}
+                            onChange={(e) => setEditedData({
+                              ...editedData,
+                              groom: { ...editedData.groom, contactNumber: e.target.value }
+                            })}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                          />
+                        ) : (
+                          <p className="mt-1">{selectedBooking.groom?.contactNumber}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Email</label>
+                        {isEditing ? (
+                          <input
+                            type="email"
+                            value={editedData.groom?.email || ''}
+                            onChange={(e) => setEditedData({
+                              ...editedData,
+                              groom: { ...editedData.groom, email: e.target.value }
+                            })}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                          />
+                        ) : (
+                          <p className="mt-1">{selectedBooking.groom?.email}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Address</label>
+                        {isEditing ? (
+                          <textarea
+                            value={editedData.groom?.address || ''}
+                            onChange={(e) => setEditedData({
+                              ...editedData,
+                              groom: { ...editedData.groom, address: e.target.value }
+                            })}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                            rows="3"
+                          />
+                        ) : (
+                          <p className="mt-1">{selectedBooking.groom?.address}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Photo</label>
+                        {selectedBooking.groom?.photo ? (
+                          <div className="mt-2">
+                            <img 
+                              src={selectedBooking.groom.photo} 
+                              alt="Groom" 
+                              className="h-32 w-32 object-cover rounded-lg"
+                            />
+                          </div>
+                        ) : (
+                          <p className="mt-1 text-gray-500">No photo uploaded</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Documents</label>
+                        {selectedBooking.groom?.documents && selectedBooking.groom.documents.length > 0 ? (
+                          <div className="mt-2 space-y-2">
+                            {selectedBooking.groom.documents.map((doc, index) => (
+                              <div key={index} className="flex items-center space-x-2">
+                                <DocumentIcon className="h-5 w-5 text-gray-400" />
+                                <a 
+                                  href={doc} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 hover:underline"
+                                >
+                                  Document {index + 1}
+                                </a>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="mt-1 text-gray-500">No documents uploaded</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="border-b pb-4">
+                    <h3 className="text-lg font-medium mb-4">Ceremony Details</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Ceremony Date</label>
+                        {isEditing ? (
+                          <input
+                            type="date"
+                            value={new Date(editedData.ceremonyDate).toISOString().split('T')[0]}
+                            onChange={(e) => setEditedData({
+                              ...editedData,
+                              ceremonyDate: e.target.value
+                            })}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                          />
+                        ) : (
+                          <p className="mt-1">{new Date(selectedBooking.ceremonyDate).toLocaleDateString()}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Status</label>
+                        <p className="mt-1">
+                          <span className={`px-2 py-1 rounded-full text-sm ${
+                            selectedBooking.status === 'confirmed' ? 'bg-green-100 text-green-800' :
+                            selectedBooking.status === 'approved' ? 'bg-blue-100 text-blue-800' :
+                            selectedBooking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                            selectedBooking.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {selectedBooking.status}
+                          </span>
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Payment Status</label>
+                        <p className="mt-1">
+                          <span className={`px-2 py-1 rounded-full text-sm ${
+                            selectedBooking.paymentStatus === 'paid' ? 'bg-green-100 text-green-800' :
+                            'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {selectedBooking.paymentStatus}
+                          </span>
+                        </p>
+                      </div>
+                      {selectedBooking.rejectionReason && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">Rejection Reason</label>
+                          <p className="mt-1 text-red-600">{selectedBooking.rejectionReason}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
 
               <div className="flex justify-end space-x-3 mt-6">
                 {!isEditing && (

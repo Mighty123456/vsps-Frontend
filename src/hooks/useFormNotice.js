@@ -52,12 +52,16 @@ const useFormNotice = () => {
             // If form has become active and wasn't active before
             if (currentStatus && !wasActive) {
               try {
-                await createFormNotification(
+                const notification = await createFormNotification(
                   form.formType,
                   `${form.title} is now open for registration. Click here to fill the form.`
                 );
+                if (notification) {
+                  console.log('Notification created successfully:', notification);
+                }
               } catch (notifError) {
                 console.error('Error creating notification:', notifError);
+                // Continue execution even if notification fails
               }
             }
 

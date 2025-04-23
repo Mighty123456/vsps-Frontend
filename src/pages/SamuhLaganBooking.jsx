@@ -16,7 +16,7 @@ import {
   Divider,
   CircularProgress
 } from '@mui/material';
-import { PhotoCamera, CloudUpload, AccessTime, Person, Email, Phone, Home, Badge } from '@mui/icons-material';
+import { PhotoCamera, CloudUpload, AccessTime, Person, Email, Phone, Home, Badge, Upload } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 
 // Define API base URL with fallback
@@ -321,6 +321,16 @@ const SamuhLaganBooking = ({ formDetails }) => {
   const [bridePhotoPreview, setBridePhotoPreview] = useState(null);
   const [groomPhotoPreview, setGroomPhotoPreview] = useState(null);
 
+  // Format date for display
+  const formatDate = (dateString) => {
+    if (!dateString) return 'Not set';
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
   const handleChange = (e) => {
     const { name, value, type, files } = e.target;
     
@@ -370,18 +380,84 @@ const SamuhLaganBooking = ({ formDetails }) => {
         throw new Error('Please log in to submit the form');
       }
 
+      // Debug user object
+      console.log('Current user object:', user);
+      
+      // Check for user ID in different possible formats
+      const userId = user?._id || user?.id || user?.userId;
+      if (!userId) {
+        throw new Error('User ID not found. Please try logging in again.');
+      }
+
       const formDataToSend = new FormData();
-      Object.keys(formData).forEach(key => {
-        if (Array.isArray(formData[key])) {
-          formData[key].forEach(file => {
-            formDataToSend.append(key, file);
-          });
-        } else {
-          formDataToSend.append(key, formData[key]);
-        }
+      
+      // Add user ID
+      formDataToSend.append('user', userId);
+      
+      // Add bride details
+      formDataToSend.append('bride.name', formData.brideName);
+      formDataToSend.append('bride.fatherName', formData.brideFatherName);
+      formDataToSend.append('bride.motherName', formData.brideMotherName);
+      formDataToSend.append('bride.age', formData.brideAge);
+      formDataToSend.append('bride.contactNumber', formData.brideMobile);
+      formDataToSend.append('bride.email', formData.brideEmail);
+      formDataToSend.append('bride.address', formData.brideAddress);
+      
+      if (formData.bridePhoto?.[0]) {
+        formDataToSend.append('bridePhoto', formData.bridePhoto[0]);
+      }
+      if (formData.brideDocuments) {
+        Array.from(formData.brideDocuments).forEach(file => {
+          formDataToSend.append('brideDocuments', file);
+        });
+      }
+
+      // Add groom details
+      formDataToSend.append('groom.name', formData.groomName);
+      formDataToSend.append('groom.fatherName', formData.groomFatherName);
+      formDataToSend.append('groom.motherName', formData.groomMotherName);
+      formDataToSend.append('groom.age', formData.groomAge);
+      formDataToSend.append('groom.contactNumber', formData.groomMobile);
+      formDataToSend.append('groom.email', formData.groomEmail);
+      formDataToSend.append('groom.address', formData.groomAddress);
+      
+      if (formData.groomPhoto?.[0]) {
+        formDataToSend.append('groomPhoto', formData.groomPhoto[0]);
+      }
+      if (formData.groomDocuments) {
+        Array.from(formData.groomDocuments).forEach(file => {
+          formDataToSend.append('groomDocuments', file);
+        });
+      }
+
+      // Add ceremony date
+      formDataToSend.append('ceremonyDate', formDetails.eventDate);
+
+      // Log the form data before sending
+      console.log('Form data being sent:', {
+        user: userId,
+        bride: {
+          name: formData.brideName,
+          fatherName: formData.brideFatherName,
+          motherName: formData.brideMotherName,
+          age: formData.brideAge,
+          contactNumber: formData.brideMobile,
+          email: formData.brideEmail,
+          address: formData.brideAddress
+        },
+        groom: {
+          name: formData.groomName,
+          fatherName: formData.groomFatherName,
+          motherName: formData.groomMotherName,
+          age: formData.groomAge,
+          contactNumber: formData.groomMobile,
+          email: formData.groomEmail,
+          address: formData.groomAddress
+        },
+        ceremonyDate: formDetails.eventDate
       });
 
-      const response = await fetch(`${API_BASE_URL}/api/forms/samuhLagan/submit`, {
+      const response = await fetch(`${API_BASE_URL}/api/bookings/samuh-lagan/submit`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -389,17 +465,19 @@ const SamuhLaganBooking = ({ formDetails }) => {
         body: formDataToSend
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to submit form');
+        throw new Error(data.message || 'Failed to submit form');
       }
 
-      const data = await response.json();
       if (data.success) {
         setSubmitSuccess(true);
         setTimeout(() => {
           navigate('/dashboard');
         }, 3000);
+      } else {
+        throw new Error(data.message || 'Failed to submit form');
       }
     } catch (error) {
       console.error('Error submitting form:', error);
@@ -468,7 +546,7 @@ const SamuhLaganBooking = ({ formDetails }) => {
     );
   };
 
-  const renderFormSection = (prefix, title, photoPreview, handleChange) => (
+  const renderFormSection = (prefix, title, photoPreview) => (
     <StyledCard>
       <CardContent sx={{ p: 4, background: colors.background.paper }}>
         <Typography 
@@ -484,8 +562,8 @@ const SamuhLaganBooking = ({ formDetails }) => {
         >
           {title}
         </Typography>
-          <Grid container spacing={3}>
-            <Grid item xs={12}>
+        <Grid container spacing={3}>
+          <Grid item xs={12}>
             <Box display="flex" alignItems="center" gap={3} mb={4}>
               <StyledAvatar
                 src={photoPreview}
@@ -508,114 +586,127 @@ const SamuhLaganBooking = ({ formDetails }) => {
                 />
               </PhotoUploadButton>
             </Box>
-            </Grid>
+          </Grid>
 
           <Grid item xs={12}>
             <StyledTextField
-                fullWidth
-                label="Full Name"
+              fullWidth
+              label="Full Name"
               name={`${prefix}Name`}
-                required
+              value={formData[`${prefix}Name`]}
+              onChange={handleChange}
+              required
               InputProps={{
                 startAdornment: <Person sx={{ mr: 1, color: 'action.active' }} />,
               }}
-              />
-            </Grid>
-
-            <Grid item xs={12} sm={6}>
-            <StyledTextField
-                fullWidth
-              label="Father's Name"
-              name={`${prefix}FatherName`}
-                required
-              />
-            </Grid>
-
-            <Grid item xs={12} sm={6}>
-            <StyledTextField
-                fullWidth
-              label="Mother's Name"
-              name={`${prefix}MotherName`}
-                required
-              />
-            </Grid>
+            />
+          </Grid>
 
           <Grid item xs={12} sm={6}>
             <StyledTextField
-                fullWidth
+              fullWidth
+              label="Father's Name"
+              name={`${prefix}FatherName`}
+              value={formData[`${prefix}FatherName`]}
+              onChange={handleChange}
+              required
+            />
+          </Grid>
+
+          <Grid item xs={12} sm={6}>
+            <StyledTextField
+              fullWidth
+              label="Mother's Name"
+              name={`${prefix}MotherName`}
+              value={formData[`${prefix}MotherName`]}
+              onChange={handleChange}
+              required
+            />
+          </Grid>
+
+          <Grid item xs={12} sm={6}>
+            <StyledTextField
+              fullWidth
               label="Age"
               name={`${prefix}Age`}
               type="number"
-                required
+              value={formData[`${prefix}Age`]}
+              onChange={handleChange}
+              required
               InputProps={{
                 startAdornment: <Badge sx={{ mr: 1, color: 'action.active' }} />,
               }}
-              />
-            </Grid>
+            />
+          </Grid>
 
-            <Grid item xs={12} sm={6}>
+          <Grid item xs={12} sm={6}>
             <StyledTextField
-                fullWidth
+              fullWidth
               label="Mobile Number"
               name={`${prefix}Mobile`}
               type="tel"
-                required
+              value={formData[`${prefix}Mobile`]}
+              onChange={handleChange}
+              required
               InputProps={{
                 startAdornment: <Phone sx={{ mr: 1, color: 'action.active' }} />,
               }}
-              />
-            </Grid>
+            />
+          </Grid>
 
           <Grid item xs={12}>
             <StyledTextField
-                fullWidth
+              fullWidth
               label="Email"
               name={`${prefix}Email`}
               type="email"
-                required
+              value={formData[`${prefix}Email`]}
+              onChange={handleChange}
+              required
               InputProps={{
                 startAdornment: <Email sx={{ mr: 1, color: 'action.active' }} />,
               }}
-              />
-            </Grid>
+            />
+          </Grid>
 
           <Grid item xs={12}>
             <StyledTextField
-                fullWidth
+              fullWidth
               label="Address"
               name={`${prefix}Address`}
+              value={formData[`${prefix}Address`]}
+              onChange={handleChange}
+              required
               multiline
               rows={3}
-                required
               InputProps={{
-                startAdornment: <Home sx={{ mr: 1, mt: 1, color: 'action.active' }} />,
+                startAdornment: <Home sx={{ mr: 1, color: 'action.active' }} />,
               }}
-              />
-            </Grid>
+            />
+          </Grid>
 
-            <Grid item xs={12}>
-            <DocumentUploadButton
-              component="label"
-              fullWidth
-            >
-              <CloudUpload sx={{ fontSize: 32, mb: 1 }} />
-              <Typography variant="body1" sx={{ mb: 0.5 }}>
-                Upload Required Documents
-              </Typography>
-              <Typography variant="caption" color="textSecondary">
-                L.C, Aadhar Card, Birth Certificate, Affidavit
-              </Typography>
-              <input
-                type="file"
-                name={`${prefix}Documents`}
-                hidden
-                multiple
-                onChange={handleChange}
-              />
-            </DocumentUploadButton>
-            {renderUploadedDocuments(prefix)}
-            </Grid>
-            </Grid>
+          <Grid item xs={12}>
+            <input
+              type="file"
+              name={`${prefix}Documents`}
+              onChange={handleChange}
+              multiple
+              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+              style={{ display: 'none' }}
+              id={`${prefix}Documents`}
+            />
+            <label htmlFor={`${prefix}Documents`}>
+              <Button
+                variant="outlined"
+                component="span"
+                startIcon={<Upload />}
+                sx={{ mt: 2 }}
+              >
+                Upload Documents
+              </Button>
+            </label>
+          </Grid>
+        </Grid>
       </CardContent>
     </StyledCard>
   );
@@ -659,6 +750,21 @@ const SamuhLaganBooking = ({ formDetails }) => {
         >
           Samuh Lagan Registration
         </Typography>
+
+        {formDetails?.eventDate && (
+          <Box sx={{ 
+            textAlign: 'center', 
+            mb: 4,
+            p: 2,
+            backgroundColor: colors.secondary.light,
+            borderRadius: '12px',
+            border: `1px solid ${colors.secondary.main}`
+          }}>
+            <Typography variant="h6" sx={{ color: colors.primary.main, fontWeight: 600 }}>
+              Ceremony Date: {formatDate(formDetails.eventDate)}
+            </Typography>
+          </Box>
+        )}
 
         {countdown && (
           <CountdownTimer elevation={0}>
@@ -743,13 +849,13 @@ const SamuhLaganBooking = ({ formDetails }) => {
           ) : (
             <form onSubmit={handleSubmit}>
               <Grid container spacing={4}>
-                <Grid item xs={12} md={6}>
-                  {renderFormSection('bride', 'Bride Details', bridePhotoPreview, handleChange)}
+                <Grid columns={{ xs: 12, md: 6 }}>
+                  {renderFormSection('bride', 'Bride Details', bridePhotoPreview)}
                 </Grid>
-                <Grid item xs={12} md={6}>
-                  {renderFormSection('groom', 'Groom Details', groomPhotoPreview, handleChange)}
+                <Grid columns={{ xs: 12, md: 6 }}>
+                  {renderFormSection('groom', 'Groom Details', groomPhotoPreview)}
                 </Grid>
-                <Grid item xs={12}>
+                <Grid columns={{ xs: 12 }}>
                   <Box display="flex" justifyContent="center">
                     <StyledButton
                     type="submit"

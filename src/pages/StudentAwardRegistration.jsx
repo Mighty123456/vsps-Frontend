@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FaUser, FaEnvelope, FaPhone, FaCalendarAlt, FaMapMarkerAlt, FaSchool, FaGraduationCap, FaTrophy, FaFileUpload, FaCheck, FaExclamationCircle } from 'react-icons/fa';
+import { FaUser, FaEnvelope, FaPhone, FaCalendarAlt, FaMapMarkerAlt, FaSchool, FaGraduationCap, FaTrophy, FaFileUpload, FaCheck, FaExclamationCircle, FaClock } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
@@ -17,6 +17,8 @@ const StudentAwardRegistration = () => {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [canAccessForm, setCanAccessForm] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(null);
+  const [eventDate, setEventDate] = useState(null);
 
   useEffect(() => {
     const checkFormStatus = async () => {
@@ -107,6 +109,9 @@ const StudentAwardRegistration = () => {
         if (studentAwardForm.endTime) {
           setFormEndTime(new Date(studentAwardForm.endTime));
         }
+        if (studentAwardForm.eventDate) {
+          setEventDate(new Date(studentAwardForm.eventDate));
+        }
         
       } catch (error) {
         console.error('Error checking form status:', error);
@@ -118,6 +123,33 @@ const StudentAwardRegistration = () => {
 
     checkFormStatus();
   }, [navigate, user]);
+
+  // Add timer effect
+  useEffect(() => {
+    if (!formEndTime) return;
+
+    const calculateTimeLeft = () => {
+      const now = new Date();
+      const difference = formEndTime - now;
+      
+      if (difference <= 0) {
+        setTimeLeft(null);
+        return;
+      }
+
+      const days = Math.floor(difference / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((difference / (1000 * 60 * 60)) % 24);
+      const minutes = Math.floor((difference / 1000 / 60) % 60);
+      const seconds = Math.floor((difference / 1000) % 60);
+
+      setTimeLeft({ days, hours, minutes, seconds });
+    };
+
+    calculateTimeLeft();
+    const timer = setInterval(calculateTimeLeft, 1000);
+
+    return () => clearInterval(timer);
+  }, [formEndTime]);
 
   const [formData, setFormData] = useState({
     // Section A: Student Information
@@ -159,54 +191,88 @@ const StudentAwardRegistration = () => {
     try {
       const formDataToSend = new FormData();
       
-      // Append all form fields
-      Object.entries(formData).forEach(([key, value]) => {
-        if (key !== 'marksheet' && key !== 'declaration') {
-          formDataToSend.append(key, value);
-        }
-      });
+      // Map form fields to match server's expected structure
+      formDataToSend.append('name', formData.fullName);
+      formDataToSend.append('contactNumber', formData.contactNumber);
+      formDataToSend.append('email', formData.email);
+      formDataToSend.append('address', formData.address);
+      formDataToSend.append('schoolName', formData.schoolName);
+      formDataToSend.append('standard', formData.standard);
+      formDataToSend.append('boardName', formData.boardName);
+      formDataToSend.append('examYear', formData.examYear);
+      formDataToSend.append('totalPercentage', formData.totalPercentage);
+      
+      // Handle rank value
+      const rankValue = formData.rank === 'none' ? 'none' : 
+        formData.rank === '1st' ? '1st' :
+        formData.rank === '2nd' ? '2nd' :
+        formData.rank === '3rd' ? '3rd' : 'none';
+      formDataToSend.append('rank', rankValue);
 
       // Append marksheet file if exists
       if (formData.marksheet) {
         formDataToSend.append('marksheet', formData.marksheet);
       }
 
-      // Append declaration
-      formDataToSend.append('declaration', formData.declaration);
+      // Get user ID from auth context
+      const userId = user?._id || user?.id;
+      if (!userId) {
+        throw new Error('User ID not found. Please try logging in again.');
+      }
+      formDataToSend.append('user', userId);
 
       const token = localStorage.getItem('token');
       if (!token) {
         throw new Error('Please log in to submit the form');
       }
 
-      const response = await axios.post('/api/student-awards/register', formDataToSend, {
+      // Log the form data being sent
+      console.log('Submitting form data:', {
+        name: formData.fullName,
+        contactNumber: formData.contactNumber,
+        email: formData.email,
+        address: formData.address,
+        schoolName: formData.schoolName,
+        standard: formData.standard,
+        boardName: formData.boardName,
+        examYear: formData.examYear,
+        totalPercentage: formData.totalPercentage,
+        rank: rankValue,
+        userId: userId
+      });
+
+      const response = await axios.post(`${API_BASE_URL}/api/bookings/student-awards/register`, formDataToSend, {
         headers: {
           'Content-Type': 'multipart/form-data',
           Authorization: `Bearer ${token}`
         }
       });
 
-      setShowSuccessPopup(true);
-      setFormData({
-        fullName: '',
-        dateOfBirth: '',
-        contactNumber: '',
-        email: '',
-        address: '',
-        schoolName: '',
-        standard: '',
-        boardName: '',
-        examYear: '',
-        totalPercentage: '',
-        rank: 'none',
-        marksheet: null,
-        declaration: false
-      });
+      if (response.data.success) {
+        setShowSuccessPopup(true);
+        setFormData({
+          fullName: '',
+          dateOfBirth: '',
+          contactNumber: '',
+          email: '',
+          address: '',
+          schoolName: '',
+          standard: '',
+          boardName: '',
+          examYear: '',
+          totalPercentage: '',
+          rank: 'none',
+          marksheet: null,
+          declaration: false
+        });
 
-      setTimeout(() => {
-        setShowSuccessPopup(false);
-        navigate('/services');
-      }, 3000);
+        setTimeout(() => {
+          setShowSuccessPopup(false);
+          navigate('/services');
+        }, 3000);
+      } else {
+        throw new Error(response.data.message || 'Failed to submit form');
+      }
     } catch (error) {
       console.error('Error submitting form:', error);
       if (error.response?.data?.message) {
@@ -278,20 +344,48 @@ const StudentAwardRegistration = () => {
             Wadi (Samaj) proudly honors meritorious students for their academic excellence.
           </p>
           
-          {/* Display form availability period if set */}
-          {(formStartTime || formEndTime) && (
-            <div className="mt-4 p-3 bg-purple-50 rounded-lg inline-block">
-              <p className="text-sm text-purple-700">
-                {formStartTime && formEndTime ? (
-                  <>Available from <span className="font-semibold">{formStartTime.toLocaleDateString()}</span> to <span className="font-semibold">{formEndTime.toLocaleDateString()}</span></>
-                ) : formStartTime ? (
-                  <>Available from <span className="font-semibold">{formStartTime.toLocaleDateString()}</span></>
-                ) : formEndTime ? (
-                  <>Available until <span className="font-semibold">{formEndTime.toLocaleDateString()}</span></>
-                ) : null}
-              </p>
-            </div>
-          )}
+          {/* Display form availability period and timer */}
+          <div className="mt-4 space-y-2">
+            {(formStartTime || formEndTime) && (
+              <div className="p-3 bg-purple-50 rounded-lg inline-block">
+                <p className="text-sm text-purple-700">
+                  {formStartTime && formEndTime ? (
+                    <>Available from <span className="font-semibold">{formStartTime.toLocaleDateString()}</span> to <span className="font-semibold">{formEndTime.toLocaleDateString()}</span></>
+                  ) : formStartTime ? (
+                    <>Available from <span className="font-semibold">{formStartTime.toLocaleDateString()}</span></>
+                  ) : formEndTime ? (
+                    <>Available until <span className="font-semibold">{formEndTime.toLocaleDateString()}</span></>
+                  ) : null}
+                </p>
+              </div>
+            )}
+
+            {/* Timer Display */}
+            {timeLeft && (
+              <div className="p-3 bg-blue-50 rounded-lg inline-block">
+                <div className="flex items-center justify-center space-x-2">
+                  <FaClock className="text-blue-500" />
+                  <p className="text-sm text-blue-700">
+                    Time remaining: <span className="font-semibold">
+                      {timeLeft.days}d {timeLeft.hours}h {timeLeft.minutes}m {timeLeft.seconds}s
+                    </span>
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Event Date Display */}
+            {eventDate && (
+              <div className="p-3 bg-green-50 rounded-lg inline-block">
+                <div className="flex items-center justify-center space-x-2">
+                  <FaCalendarAlt className="text-green-500" />
+                  <p className="text-sm text-green-700">
+                    Award Ceremony Date: <span className="font-semibold">{eventDate.toLocaleDateString()}</span>
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Success Popup */}

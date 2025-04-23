@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   PencilIcon, 
   TrashIcon, 
@@ -21,6 +21,8 @@ import { FaCalendar, FaUsers, FaGem, FaClock, FaDownload } from 'react-icons/fa'
 import { toast } from 'react-hot-toast';
 import { uploadToCloudinary, deleteFromCloudinary, FOLDERS } from '../../config/cloudinary';
 import TestUpload from '../../components/TestUpload';
+
+const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3000').replace(/\/$/, '');
 
 const ContentManagement = () => {
   // Helper function to construct image URLs
@@ -106,57 +108,53 @@ const ContentManagement = () => {
     }
   };
 
-  // Handle delete operation
-  const handleDelete = async (type, id) => {
-    if (!window.confirm('Are you sure you want to delete this item?')) return;
-    
-    try {
-      setError(null);
-      let response;
+  // Add showNotification function
+  const showNotification = (message, type = 'success') => {
+    toast[type](message, {
+      duration: 3000,
+      position: 'top-right',
+    });
+  };
 
+  // Update handleDelete function
+  const handleDelete = async (type, id) => {
+    try {
+      let endpoint;
       switch (type) {
         case 'hero-slide':
-          response = await axios.delete(`/api/content/home/hero-slide/${id}`);
-          break;
-        case 'event-category':
-          response = await deleteEventCategory(id);
-          break;
-        case 'gallery':
-          response = await deleteGalleryItem(id);
-          if (!response.success) {
-            throw new Error(response.message || 'Failed to delete gallery item');
-          }
+          endpoint = `${API_BASE_URL}/api/content/home/hero-slide/${id}`;
           break;
         case 'leadership-member':
-          response = await axios.delete(`/api/content/home/leadership/members/${id}`);
-          if (!response.data.success) {
-            throw new Error(response.data.message || 'Failed to delete member');
-          }
-          // Update the local state to remove the member immediately
-          setHomeContent(prevContent => {
-            if (!prevContent?.leadership?.members) return prevContent;
-            return {
-              ...prevContent,
-              leadership: {
-                ...prevContent.leadership,
-                members: prevContent.leadership.members.filter(member => member._id !== id)
-              }
-            };
-          });
+          endpoint = `${API_BASE_URL}/api/content/home/leadership/members/${id}`;
+          break;
+        case 'event-category':
+          endpoint = `${API_BASE_URL}/api/content/events/categories/${id}`;
+          break;
+        case 'gallery':
+          endpoint = `${API_BASE_URL}/api/content/gallery/${id}`;
           break;
         default:
-          throw new Error('Invalid item type');
+          throw new Error('Invalid content type');
       }
 
-      toast.success(response.data.message || 'Item deleted successfully');
-      // Only fetch content if it's not a leadership member deletion
-      if (type !== 'leadership-member') {
-        await fetchAllContent();
+      console.log('Deleting item:', { id, type, endpoint });
+
+      const response = await axios.delete(endpoint, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (response.data.success) {
+        showNotification('Item deleted successfully');
+        // Refresh the content
+        fetchAllContent();
+      } else {
+        throw new Error(response.data.message || 'Failed to delete item');
       }
-    } catch (err) {
-      console.error('Error deleting item:', err);
-      setError(err.message || 'Failed to delete item. Please try again.');
-      toast.error(err.message || 'Failed to delete item');
+    } catch (error) {
+      console.error('Error deleting item:', error);
+      showNotification(error.response?.data?.message || 'Failed to delete item', 'error');
     }
   };
 
@@ -174,10 +172,9 @@ const ContentManagement = () => {
         case 'hero-slide':
           data.append('title', formEntries.get('title') || '');
           data.append('description', formEntries.get('description') || '');
-          if (formEntries.get('image') instanceof File) {
-            data.append('image', formEntries.get('image'));
-          } else if (formEntries.get('image')) {
-            data.append('image', formEntries.get('image'));
+          // Only append image if it exists in editingItem (from Cloudinary)
+          if (editingItem.image) {
+            data.append('image', editingItem.image);
           }
           data.append('isActive', formEntries.get('isActive') === 'on' ? 'true' : 'false');
           data.append('order', formEntries.get('order') || '0');
@@ -200,15 +197,10 @@ const ContentManagement = () => {
           data.append('highlights', JSON.stringify(highlights));
 
           // Handle download section
-          const downloadFile = formEntries.get('download.file');
-          if (downloadFile instanceof File) {
-            data.append('downloadFile', downloadFile);
-          }
-          
           data.append('download', JSON.stringify({
             label: formEntries.get('download.label') || '',
             fileName: formEntries.get('download.fileName') || '',
-            url: editingItem.download?.url || '' // Preserve existing URL if no new file
+            url: editingItem.download?.url || ''
           }));
           break;
 
@@ -321,17 +313,32 @@ const ContentManagement = () => {
       switch (contentType) {
         case 'hero-slide':
           if (editingItem?._id) {
-            response = await axios.put(`/api/content/home/hero-slide/${editingItem._id}`, formData, {
-              headers: {
-                'Content-Type': 'multipart/form-data'
-              }
+            console.log('Updating slide with data:', {
+              id: editingItem._id,
+              formData: Object.fromEntries(formData.entries())
             });
+            // Convert FormData to JSON object
+            const slideData = {
+              title: formData.get('title'),
+              description: formData.get('description'),
+              image: editingItem.image,
+              isActive: formData.get('isActive') === 'true',
+              order: parseInt(formData.get('order') || '0')
+            };
+            response = await axios.put(`/api/content/home/hero-slide/${editingItem._id}`, slideData);
           } else {
-            response = await axios.post(`/api/content/home/hero-slide`, formData, {
-              headers: {
-                'Content-Type': 'multipart/form-data'
-              }
+            console.log('Creating new slide with data:', {
+              formData: Object.fromEntries(formData.entries())
             });
+            // Convert FormData to JSON object
+            const slideData = {
+              title: formData.get('title'),
+              description: formData.get('description'),
+              image: editingItem.image,
+              isActive: formData.get('isActive') === 'true',
+              order: parseInt(formData.get('order') || '0')
+            };
+            response = await axios.post(`/api/content/home/hero-slide`, slideData);
           }
           break;
           
@@ -881,12 +888,63 @@ const ContentManagement = () => {
                     name="image"
                     className="mt-1 block w-full"
                     accept="image/*"
+                    onChange={async (e) => {
+                      const file = e.target.files[0];
+                      if (file) {
+                        try {
+                          const formData = new FormData();
+                          formData.append('file', file);
+                          formData.append('upload_preset', import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET);
+                          formData.append('folder', FOLDERS.SLIDES);
+                          
+                          console.log('Uploading to Cloudinary with config:', {
+                            cloudName: import.meta.env.VITE_CLOUDINARY_CLOUD_NAME,
+                            uploadPreset: import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET,
+                            folder: FOLDERS.SLIDES,
+                            fileName: file.name,
+                            fileType: file.type,
+                            fileSize: file.size
+                          });
+                          
+                          const response = await fetch(
+                            `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload`,
+                            {
+                              method: 'POST',
+                              body: formData,
+                            }
+                          );
+
+                          if (!response.ok) {
+                            const errorData = await response.json();
+                            console.error('Cloudinary upload failed:', errorData);
+                            throw new Error(`Upload failed: ${errorData.error?.message || 'Unknown error'}`);
+                          }
+
+                          const data = await response.json();
+                          console.log('Upload successful:', data);
+                          
+                          if (data.secure_url) {
+                            setEditingItem(prev => ({
+                              ...prev,
+                              image: data.secure_url
+                            }));
+                            toast.success('Image uploaded successfully');
+                          } else {
+                            throw new Error('No secure URL in response');
+                          }
+                        } catch (error) {
+                          console.error('Error uploading image to Cloudinary:', error);
+                          toast.error('Failed to upload image: ' + (error.message || 'Unknown error'));
+                        }
+                      }
+                    }}
                   />
                   {editingItem.image && (
                     <img
                       src={getImageUrl(editingItem.image)}
                       alt="Preview"
                       className="mt-2 h-32 w-auto object-cover rounded"
+                      onError={handleImageError}
                     />
                   )}
                 </div>
@@ -999,7 +1057,7 @@ const ContentManagement = () => {
                         type="text"
                         name="download.label"
                         defaultValue={editingItem.download?.label || ''}
-                        placeholder="e.g., Download Instructions (PDF)"
+                        placeholder="e.g., Download Instructions"
                         className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                       />
                     </div>
@@ -1008,8 +1066,63 @@ const ContentManagement = () => {
                       <input
                         type="file"
                         name="download.file"
-                        accept=".pdf,.doc,.docx"
+                        accept=".pdf,.doc,.docx,.txt"
                         className="mt-1 block w-full"
+                        onChange={async (e) => {
+                          const file = e.target.files[0];
+                          if (file) {
+                            try {
+                              const formData = new FormData();
+                              formData.append('file', file);
+                              formData.append('upload_preset', import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET);
+                              formData.append('folder', FOLDERS.DOWNLOADS);
+                              formData.append('resource_type', 'raw');
+                              
+                              console.log('Uploading to Cloudinary:', {
+                                cloudName: import.meta.env.VITE_CLOUDINARY_CLOUD_NAME,
+                                uploadPreset: import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET,
+                                folder: FOLDERS.DOWNLOADS,
+                                fileName: file.name,
+                                fileType: file.type,
+                                fileSize: file.size
+                              });
+                              
+                              const response = await fetch(
+                                `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/raw/upload`,
+                                {
+                                  method: 'POST',
+                                  body: formData,
+                                }
+                              );
+
+                              if (!response.ok) {
+                                const errorData = await response.json();
+                                console.error('Cloudinary upload failed:', errorData);
+                                throw new Error(`Upload failed: ${errorData.error?.message || 'Unknown error'}`);
+                              }
+
+                              const data = await response.json();
+                              console.log('Upload successful:', data);
+                              
+                              if (data.secure_url) {
+                                setEditingItem(prev => ({
+                                  ...prev,
+                                  download: {
+                                    ...prev.download,
+                                    url: data.secure_url,
+                                    fileName: file.name
+                                  }
+                                }));
+                                toast.success('File uploaded successfully');
+                              } else {
+                                throw new Error('No secure URL in response');
+                              }
+                            } catch (error) {
+                              console.error('Error uploading file to Cloudinary:', error);
+                              toast.error('Failed to upload file: ' + (error.message || 'Unknown error'));
+                            }
+                          }
+                        }}
                       />
                       {editingItem.download?.url && (
                         <div className="mt-2">
@@ -1032,7 +1145,7 @@ const ContentManagement = () => {
                         type="text"
                         name="download.fileName"
                         defaultValue={editingItem.download?.fileName || ''}
-                        placeholder="e.g., Vadi_PartyPlot_Instructions.pdf"
+                        placeholder="e.g., instructions.pdf"
                         className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                       />
                     </div>

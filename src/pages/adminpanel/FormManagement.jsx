@@ -19,7 +19,8 @@ const FormManagement = () => {
   const [formData, setFormData] = useState({
     formName: 'samuhLagan',
     startTime: '',
-    endTime: ''
+    endTime: '',
+    eventDate: ''
   });
 
   useEffect(() => {
@@ -95,15 +96,17 @@ const FormManagement = () => {
       console.log('Sending request with data:', {
         formName: formData.formName,
         startTime: formData.startTime,
-        endTime: formData.endTime
+        endTime: formData.endTime,
+        eventDate: formData.eventDate
       });
 
-      const response = await axios.post(
-        `${API_BASE_URL}/api/admin/forms/set-form-timer`,
+      const response = await axios.put(
+        `${API_BASE_URL}/api/admin/forms/status/${formData.formName}`,
         {
-          formName: formData.formName,
+          active: true,
           startTime: formData.startTime,
-          endTime: formData.endTime
+          endTime: formData.endTime,
+          eventDate: formData.eventDate
         },
         {
           headers: {
@@ -122,6 +125,7 @@ const FormManagement = () => {
             active: true,
             startTime: updatedForm.startTime,
             endTime: updatedForm.endTime,
+            eventDate: updatedForm.eventDate,
             lastUpdated: updatedForm.lastUpdated
           }
         }));
@@ -129,7 +133,8 @@ const FormManagement = () => {
         setFormData({
           formName: 'samuhLagan',
           startTime: '',
-          endTime: ''
+          endTime: '',
+          eventDate: ''
         });
       }
     } catch (err) {
@@ -148,7 +153,27 @@ const FormManagement = () => {
 
   const formatDateTime = (dateString) => {
     if (!dateString) return 'Not set';
-    return new Date(dateString).toLocaleString();
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'Invalid date';
+    return date.toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return 'Not set';
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'Invalid date';
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
   };
 
   const isTimerExpired = (form) => {
@@ -241,6 +266,12 @@ const FormManagement = () => {
             <div className="flex items-center">
               <FaCalendarAlt className="text-gray-400 mr-2" />
               <span className="text-sm text-gray-600">
+                Event Date: {formatDate(forms.samuhLagan.eventDate)}
+              </span>
+            </div>
+            <div className="flex items-center">
+              <FaCalendarAlt className="text-gray-400 mr-2" />
+              <span className="text-sm text-gray-600">
                 Start Time: {formatDateTime(forms.samuhLagan.startTime)}
               </span>
             </div>
@@ -254,7 +285,7 @@ const FormManagement = () => {
           
           {forms.samuhLagan.lastUpdated && (
             <p className="text-sm text-gray-500 mt-4">
-              Last updated: {new Date(forms.samuhLagan.lastUpdated).toLocaleString()}
+              Last updated: {formatDateTime(forms.samuhLagan.lastUpdated)}
             </p>
           )}
         </div>
@@ -273,6 +304,12 @@ const FormManagement = () => {
           </div>
           
           <div className="space-y-2">
+            <div className="flex items-center">
+              <FaCalendarAlt className="text-gray-400 mr-2" />
+              <span className="text-sm text-gray-600">
+                Event Date: {formatDate(forms.studentAwards.eventDate)}
+              </span>
+            </div>
             <div className="flex items-center">
               <FaCalendarAlt className="text-gray-400 mr-2" />
               <span className="text-sm text-gray-600">
@@ -299,46 +336,60 @@ const FormManagement = () => {
       <div className="bg-white p-6 rounded-lg shadow">
         <h2 className="text-xl font-semibold mb-4">Set Form Timer</h2>
         <form onSubmit={handleSubmit}>
-            <div className="mb-4">
+          <div className="mb-4">
             <label className="block text-gray-700 text-sm font-bold mb-2">
               Form Name
             </label>
             <select
               name="formName"
               value={formData.formName}
-                  onChange={handleInputChange}
+              onChange={handleInputChange}
               className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
             >
               <option value="samuhLagan">Samuh Lagan Registration Form</option>
               <option value="studentAwards">Student Awards Registration Form</option>
             </select>
-            </div>
-            
-            <div className="mb-4">
-              <label className="block text-gray-700 text-sm font-bold mb-2">
-                Start Time
-              </label>
-              <input
-                type="datetime-local"
-                name="startTime"
-              value={formData.startTime}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          </div>
+          
+          <div className="mb-4">
+            <label className="block text-gray-700 text-sm font-bold mb-2">
+              Event Date
+            </label>
+            <input
+              type="date"
+              name="eventDate"
+              value={formData.eventDate}
+              onChange={handleInputChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
-              />
-            </div>
-            
-            <div className="mb-4">
-              <label className="block text-gray-700 text-sm font-bold mb-2">
-                End Time
-              </label>
-              <input
-                type="datetime-local"
-                name="endTime"
+            />
+          </div>
+          
+          <div className="mb-4">
+            <label className="block text-gray-700 text-sm font-bold mb-2">
+              Start Time
+            </label>
+            <input
+              type="datetime-local"
+              name="startTime"
+              value={formData.startTime}
+              onChange={handleInputChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
+            />
+          </div>
+          
+          <div className="mb-4">
+            <label className="block text-gray-700 text-sm font-bold mb-2">
+              End Time
+            </label>
+            <input
+              type="datetime-local"
+              name="endTime"
               value={formData.endTime}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              onChange={handleInputChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
             />
           </div>
@@ -348,17 +399,17 @@ const FormManagement = () => {
             <span className="text-sm text-gray-600">
               Setting a timer will automatically activate the form. The form will only be visible during the specified time period.
             </span>
-            </div>
-            
-              <button
+          </div>
+          
+          <button
             type="submit"
-                disabled={loading}
-                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-              >
+            disabled={loading}
+            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+          >
             {loading ? 'Setting Timer...' : 'Set Timer'}
-              </button>
+          </button>
         </form>
-        </div>
+      </div>
     </div>
   );
 };

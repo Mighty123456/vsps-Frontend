@@ -11,11 +11,26 @@ export function AuthProvider({ children }) {
     if (token) {
       try {
         const decodedToken = JSON.parse(atob(token.split('.')[1]));
-        setUser(decodedToken);
+        // Ensure we have a user ID
+        if (!decodedToken._id && !decodedToken.id && !decodedToken.userId) {
+          console.error('Token does not contain user ID');
+          localStorage.removeItem('token');
+          setUser(null);
+        } else {
+          // Normalize the user object to always have _id
+          const normalizedUser = {
+            ...decodedToken,
+            _id: decodedToken._id || decodedToken.id || decodedToken.userId
+          };
+          setUser(normalizedUser);
+        }
       } catch (error) {
         console.error('Error decoding token:', error);
         localStorage.removeItem('token');
+        setUser(null);
       }
+    } else {
+      setUser(null);
     }
     setLoading(false);
   }, []);

@@ -14,7 +14,8 @@ const FOLDERS = {
   SLIDES: 'website-content/slides',
   GALLERY: 'website-content/gallery',
   LEADERSHIP: 'website-content/leadership',
-  ABOUT: 'website-content/about'
+  ABOUT: 'website-content/about',
+  DOWNLOADS: 'website-content/downloads'
 };
 
 export const uploadToCloudinary = async (file, folder) => {
