@@ -32,6 +32,7 @@ import Notifications from './pages/Notifications';
 import SamuhLaganBooking from './pages/SamuhLaganBooking';
 import StudentAwardRegistration from './pages/StudentAwardRegistration';
 import AdminRoute from './components/AdminRoute';
+import BookedDatesCalendar from './pages/adminpanel/BookedDatesCalendar';
 import axios from 'axios';
 import React from 'react';
 
@@ -220,6 +221,7 @@ function AppContent() {
                   <Route path="/admin/reports" element={<Reports />} />
                   <Route path="/admin/users" element={<Users />} />
                   <Route path="/admin/form-management" element={<FormManagement />} />
+                  <Route path="/admin/booked-dates" element={<BookedDatesCalendar />} />
                   <Route path="/admin/*" element={<Navigate to="/admin/dashboard" />} />
                 </Routes>
               </main>

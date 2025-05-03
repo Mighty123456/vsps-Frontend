@@ -8,7 +8,8 @@ import {
   ChartBarIcon,
   SignalIcon,
   UsersIcon,
-  ClipboardDocumentListIcon
+  ClipboardDocumentListIcon,
+  CalendarDaysIcon
 } from '@heroicons/react/24/outline';
 
 const Sidebar = () => {
@@ -21,6 +22,7 @@ const Sidebar = () => {
     { name: 'Content Management', icon: PhotoIcon, path: '/admin/content-management' },
     { name: 'Form Management', icon: ClipboardDocumentListIcon, path: '/admin/form-management' },
     { name: 'Booking Management', icon: CalendarIcon, path: '/admin/booking-management' },
+    { name: 'Booked Dates', icon: CalendarDaysIcon, path: '/admin/booked-dates' },
     { name: 'Live Streams', icon: SignalIcon, path: '/admin/live-streams' },
     { name: 'Reports', icon: ChartBarIcon, path: '/admin/reports' },
   ];

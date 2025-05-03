@@ -138,6 +138,24 @@ const DocumentViewer = ({ documentUrl, documentType, onClose }) => {
   );
 };
 
+// CollapsibleSection component for interactive panels
+function CollapsibleSection({ title, children, defaultOpen = false }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="mb-4 border rounded-lg">
+      <button
+        className="w-full flex justify-between items-center px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-t-lg focus:outline-none"
+        onClick={() => setOpen(!open)}
+        type="button"
+      >
+        <span className="font-semibold">{title}</span>
+        <span>{open ? '▲' : '▼'}</span>
+      </button>
+      {open && <div className="p-4">{children}</div>}
+    </div>
+  );
+}
+
 const BookingManagement = () => {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -282,11 +300,37 @@ const BookingManagement = () => {
 
   const handleViewBooking = async (booking) => {
     try {
-      if (booking.eventType === 'Samuh Lagan') {
-        // Fetch detailed Samuh Lagan data
+      if (booking.eventType === 'Student Award Registration' || booking.schoolName) {
+        // Fetch detailed Student Award data using the correct endpoint
+        const response = await axios.get(`/api/bookings/student-awards/${booking._id}`);
+        if (response.data) {
+          setSelectedBooking({
+            ...response.data,
+            eventType: 'Student Award Registration',
+          });
+        } else {
+          showNotification('Failed to fetch Student Award details', 'error');
+        }
+      } else if (booking.eventType === 'Samuh Lagan' || booking.bride) {
+        // Fetch detailed Samuh Lagan data using the correct endpoint
         const response = await axios.get(`/api/bookings/samuh-lagan/${booking._id}`);
         if (response.data) {
-          setSelectedBooking(response.data);
+          setSelectedBooking({
+            ...response.data,
+            eventType: 'Samuh Lagan',
+            date: response.data.ceremonyDate,
+            name: `${response.data.bride?.name || ''} & ${response.data.groom?.name || ''}`,
+            guestCount: response.data.guestCount,
+            startTime: response.data.startTime,
+            endTime: response.data.endTime,
+            additionalNotes: response.data.additionalNotes,
+            status: response.data.status,
+            paymentStatus: response.data.paymentStatus,
+            rejectionReason: response.data.rejectionReason,
+            _id: response.data._id,
+            bride: response.data.bride,
+            groom: response.data.groom
+          });
         } else {
           showNotification('Failed to fetch Samuh Lagan details', 'error');
         }
@@ -806,228 +850,227 @@ const BookingManagement = () => {
             </div>
 
             <div className="space-y-6">
-              <div className="border-b pb-4">
-                <h3 className="text-lg font-medium mb-4">Customer Information</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Name</label>
-                    {isEditing ? (
-                      <input
-                        type="text"
-                        value={editedData.name}
-                        onChange={(e) => setEditedData({ ...editedData, name: e.target.value })}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                      />
-                    ) : (
-                      <p className="mt-1">{selectedBooking.name}</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Email</label>
-                    {isEditing ? (
-                      <input
-                        type="email"
-                        value={editedData.email}
-                        onChange={(e) => setEditedData({ ...editedData, email: e.target.value })}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                      />
-                    ) : (
-                      <p className="mt-1">{selectedBooking.email}</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Phone</label>
-                    {isEditing ? (
-                      <input
-                        type="tel"
-                        value={editedData.phone}
-                        onChange={(e) => setEditedData({ ...editedData, phone: e.target.value })}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                      />
-                    ) : (
-                      <p className="mt-1">{selectedBooking.phone}</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="border-b pb-4">
-                <h3 className="text-lg font-medium mb-4">Event Details</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Event Type</label>
-                    {isEditing ? (
-                      <select
-                        value={editedData.eventType}
-                        onChange={(e) => setEditedData({ ...editedData, eventType: e.target.value })}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                      >
-                        <option value="wedding">Wedding</option>
-                        <option value="corporate">Corporate Event</option>
-                        <option value="birthday">Birthday Party</option>
-                        <option value="social">Social Gathering</option>
-                      </select>
-                    ) : (
-                      <p className="mt-1">{selectedBooking.eventType}</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Guest Count</label>
-                    {isEditing ? (
-                      <input
-                        type="number"
-                        value={editedData.guestCount}
-                        onChange={(e) => setEditedData({ ...editedData, guestCount: e.target.value })}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                      />
-                    ) : (
-                      <p className="mt-1">{selectedBooking.guestCount}</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Date</label>
-                    {isEditing ? (
-                      <input
-                        type="date"
-                        value={editedData.date.split('T')[0]}
-                        onChange={(e) => setEditedData({ ...editedData, date: e.target.value })}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                      />
-                    ) : (
-                      <p className="mt-1">{new Date(selectedBooking.date).toLocaleDateString()}</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Time</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {isEditing ? (
-                        <>
-                          <input
-                            type="time"
-                            value={editedData.startTime}
-                            onChange={(e) => setEditedData({ ...editedData, startTime: e.target.value })}
-                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                          />
-                          <input
-                            type="time"
-                            value={editedData.endTime}
-                            onChange={(e) => setEditedData({ ...editedData, endTime: e.target.value })}
-                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                          />
-                        </>
-                      ) : (
-                        <p className="mt-1">{`${selectedBooking.startTime} - ${selectedBooking.endTime}`}</p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="border-b pb-4">
-                <h3 className="text-lg font-medium mb-4">Event Document</h3>
-                {selectedBooking.eventDocument ? (
-                  <div className="space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault();
-                          const formattedUrl = selectedBooking.eventDocument.startsWith('http') 
-                            ? selectedBooking.eventDocument 
-                            : `http://localhost:3000${selectedBooking.eventDocument.startsWith('/') ? '' : '/'}${selectedBooking.eventDocument}`;
-                          
-                          // Create a link element and trigger a click
-                          const link = document.createElement('a');
-                          link.href = formattedUrl;
-                          link.target = '_blank';
-                          link.rel = 'noopener noreferrer';
-                          document.body.appendChild(link);
-                          link.click();
-                          document.body.removeChild(link);
-                        }}
-                        className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                      >
-                        <DocumentIcon className="h-5 w-5 mr-2" />
-                        View Document
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault();
-                          const formattedUrl = selectedBooking.eventDocument.startsWith('http') 
-                            ? selectedBooking.eventDocument 
-                            : `http://localhost:3000${selectedBooking.eventDocument.startsWith('/') ? '' : '/'}${selectedBooking.eventDocument}`;
-                          
-                          // Create a link element and trigger a click
-                          const link = document.createElement('a');
-                          link.href = formattedUrl;
-                          link.target = '_blank';
-                          link.rel = 'noopener noreferrer';
-                          document.body.appendChild(link);
-                          link.click();
-                          document.body.removeChild(link);
-                        }}
-                        className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                      >
-                        <ArrowDownTrayIcon className="h-5 w-5 mr-2" />
-                        Download
-                      </button>
-                      {isEditing && (
-                        <input
-                          type="file"
-                          onChange={(e) => {
-                            const file = e.target.files[0];
-                            if (file) {
-                              const formData = new FormData();
-                              formData.append('document', file);
-                              axios.post('/api/bookings/upload-document', formData, {
-                                headers: {
-                                  'Content-Type': 'multipart/form-data'
-                                }
-                              })
-                              .then(response => {
-                                setEditedData({
-                                  ...editedData,
-                                  eventDocument: response.data.documentUrl
-                                });
-                              })
-                              .catch(error => {
-                                console.error('Error uploading document:', error);
-                                showNotification('Failed to upload document', 'error');
-                              });
-                            }
-                          }}
-                          className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                        />
-                      )}
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      <p>Document Name: {selectedBooking.eventDocument.split('/').pop()}</p>
-                      <p>Document Type: {selectedBooking.eventDocument.split('.').pop().toUpperCase()}</p>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-gray-500">No document uploaded</p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Additional Notes</label>
-                {isEditing ? (
-                  <textarea
-                    value={editedData.additionalNotes}
-                    onChange={(e) => setEditedData({ ...editedData, additionalNotes: e.target.value })}
-                    rows="4"
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                  />
-                ) : (
-                  <p className="mt-1">{selectedBooking.additionalNotes}</p>
-                )}
-              </div>
-
-              {/* Only show bride and groom sections for Samuh Lagan bookings */}
-              {selectedBooking.eventType === 'Samuh Lagan' && selectedBooking.bride && selectedBooking.groom && (
+              {selectedBooking.eventType !== 'Samuh Lagan' && (
                 <>
                   <div className="border-b pb-4">
-                    <h3 className="text-lg font-medium mb-4">Bride Information</h3>
+                    <h3 className="text-lg font-medium mb-4">Customer Information</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Name</label>
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={editedData.name}
+                            onChange={(e) => setEditedData({ ...editedData, name: e.target.value })}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                          />
+                        ) : (
+                          <p className="mt-1">{selectedBooking.name}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Email</label>
+                        {isEditing ? (
+                          <input
+                            type="email"
+                            value={editedData.email}
+                            onChange={(e) => setEditedData({ ...editedData, email: e.target.value })}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                          />
+                        ) : (
+                          <p className="mt-1">{selectedBooking.email}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Phone</label>
+                        {isEditing ? (
+                          <input
+                            type="tel"
+                            value={editedData.phone}
+                            onChange={(e) => setEditedData({ ...editedData, phone: e.target.value })}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                          />
+                        ) : (
+                          <p className="mt-1">{selectedBooking.phone}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="border-b pb-4">
+                    <h3 className="text-lg font-medium mb-4">Event Details</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Event Type</label>
+                        {isEditing ? (
+                          <select
+                            value={editedData.eventType}
+                            onChange={(e) => setEditedData({ ...editedData, eventType: e.target.value })}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                          >
+                            <option value="wedding">Wedding</option>
+                            <option value="corporate">Corporate Event</option>
+                            <option value="birthday">Birthday Party</option>
+                            <option value="social">Social Gathering</option>
+                          </select>
+                        ) : (
+                          <p className="mt-1">{selectedBooking.eventType}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Guest Count</label>
+                        {isEditing ? (
+                          <input
+                            type="number"
+                            value={editedData.guestCount}
+                            onChange={(e) => setEditedData({ ...editedData, guestCount: e.target.value })}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                          />
+                        ) : (
+                          <p className="mt-1">{selectedBooking.guestCount}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Date</label>
+                        {isEditing ? (
+                          <input
+                            type="date"
+                            value={editedData.date.split('T')[0]}
+                            onChange={(e) => setEditedData({ ...editedData, date: e.target.value })}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                          />
+                        ) : (
+                          <p className="mt-1">{new Date(selectedBooking.date).toLocaleDateString()}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Time</label>
+                        <div className="grid grid-cols-2 gap-2">
+                          {isEditing ? (
+                            <>
+                              <input
+                                type="time"
+                                value={editedData.startTime}
+                                onChange={(e) => setEditedData({ ...editedData, startTime: e.target.value })}
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                              />
+                              <input
+                                type="time"
+                                value={editedData.endTime}
+                                onChange={(e) => setEditedData({ ...editedData, endTime: e.target.value })}
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                              />
+                            </>
+                          ) : (
+                            <p className="mt-1">{`${selectedBooking.startTime} - ${selectedBooking.endTime}`}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="border-b pb-4">
+                    <h3 className="text-lg font-medium mb-4">Event Document</h3>
+                    {selectedBooking.eventDocument ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              const formattedUrl = selectedBooking.eventDocument.startsWith('http') 
+                                ? selectedBooking.eventDocument 
+                                : `http://localhost:3000${selectedBooking.eventDocument.startsWith('/') ? '' : '/'}${selectedBooking.eventDocument}`;
+                              
+                              // Create a link element and trigger a click
+                              const link = document.createElement('a');
+                              link.href = formattedUrl;
+                              link.target = '_blank';
+                              link.rel = 'noopener noreferrer';
+                              document.body.appendChild(link);
+                              link.click();
+                              document.body.removeChild(link);
+                            }}
+                            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                          >
+                            <DocumentIcon className="h-5 w-5 mr-2" />
+                            View Document
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              const formattedUrl = selectedBooking.eventDocument.startsWith('http') 
+                                ? selectedBooking.eventDocument 
+                                : `http://localhost:3000${selectedBooking.eventDocument.startsWith('/') ? '' : '/'}${selectedBooking.eventDocument}`;
+                              
+                              // Create a link element and trigger a click
+                              const link = document.createElement('a');
+                              link.href = formattedUrl;
+                              link.target = '_blank';
+                              link.rel = 'noopener noreferrer';
+                              document.body.appendChild(link);
+                              link.click();
+                              document.body.removeChild(link);
+                            }}
+                            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                          >
+                            <ArrowDownTrayIcon className="h-5 w-5 mr-2" />
+                            Download
+                          </button>
+                          {isEditing && (
+                            <input
+                              type="file"
+                              onChange={(e) => {
+                                const file = e.target.files[0];
+                                if (file) {
+                                  const formData = new FormData();
+                                  formData.append('document', file);
+                                  axios.post('/api/bookings/upload-document', formData, {
+                                    headers: {
+                                      'Content-Type': 'multipart/form-data'
+                                    }
+                                  })
+                                  .then(response => {
+                                    setEditedData({
+                                      ...editedData,
+                                      eventDocument: response.data.documentUrl
+                                    });
+                                  })
+                                  .catch(error => {
+                                    console.error('Error uploading document:', error);
+                                    showNotification('Failed to upload document', 'error');
+                                  });
+                                }
+                              }}
+                              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                            />
+                          )}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          <p>Document Name: {selectedBooking.eventDocument.split('/').pop()}</p>
+                          <p>Document Type: {selectedBooking.eventDocument.split('.').pop().toUpperCase()}</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-gray-500">No document uploaded</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Additional Notes</label>
+                    {isEditing ? (
+                      <textarea
+                        value={editedData.additionalNotes}
+                        onChange={(e) => setEditedData({ ...editedData, additionalNotes: e.target.value })}
+                        rows="4"
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                      />
+                    ) : (
+                      <p className="mt-1">{selectedBooking.additionalNotes}</p>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {selectedBooking.eventType === 'Samuh Lagan' && selectedBooking.bride && selectedBooking.groom && (
+                <>
+                  <CollapsibleSection title="Bride Information" defaultOpen={true}>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700">Name</label>
@@ -1035,7 +1078,7 @@ const BookingManagement = () => {
                           <input
                             type="text"
                             value={editedData.bride?.name || ''}
-                            onChange={(e) => setEditedData({
+                            onChange={e => setEditedData({
                               ...editedData,
                               bride: { ...editedData.bride, name: e.target.value }
                             })}
@@ -1046,12 +1089,20 @@ const BookingManagement = () => {
                         )}
                       </div>
                       <div>
+                        <label className="block text-sm font-medium text-gray-700">Photo</label>
+                        {selectedBooking.bride?.photo ? (
+                          <img src={selectedBooking.bride.photo} alt="Bride" className="h-24 w-24 rounded-lg mt-1" />
+                        ) : (
+                          <p className="mt-1 text-gray-500">No photo uploaded</p>
+                        )}
+                      </div>
+                      <div>
                         <label className="block text-sm font-medium text-gray-700">Father's Name</label>
                         {isEditing ? (
                           <input
                             type="text"
                             value={editedData.bride?.fatherName || ''}
-                            onChange={(e) => setEditedData({
+                            onChange={e => setEditedData({
                               ...editedData,
                               bride: { ...editedData.bride, fatherName: e.target.value }
                             })}
@@ -1067,7 +1118,7 @@ const BookingManagement = () => {
                           <input
                             type="text"
                             value={editedData.bride?.motherName || ''}
-                            onChange={(e) => setEditedData({
+                            onChange={e => setEditedData({
                               ...editedData,
                               bride: { ...editedData.bride, motherName: e.target.value }
                             })}
@@ -1083,7 +1134,7 @@ const BookingManagement = () => {
                           <input
                             type="number"
                             value={editedData.bride?.age || ''}
-                            onChange={(e) => setEditedData({
+                            onChange={e => setEditedData({
                               ...editedData,
                               bride: { ...editedData.bride, age: e.target.value }
                             })}
@@ -1099,7 +1150,7 @@ const BookingManagement = () => {
                           <input
                             type="tel"
                             value={editedData.bride?.contactNumber || ''}
-                            onChange={(e) => setEditedData({
+                            onChange={e => setEditedData({
                               ...editedData,
                               bride: { ...editedData.bride, contactNumber: e.target.value }
                             })}
@@ -1115,7 +1166,7 @@ const BookingManagement = () => {
                           <input
                             type="email"
                             value={editedData.bride?.email || ''}
-                            onChange={(e) => setEditedData({
+                            onChange={e => setEditedData({
                               ...editedData,
                               bride: { ...editedData.bride, email: e.target.value }
                             })}
@@ -1130,7 +1181,7 @@ const BookingManagement = () => {
                         {isEditing ? (
                           <textarea
                             value={editedData.bride?.address || ''}
-                            onChange={(e) => setEditedData({
+                            onChange={e => setEditedData({
                               ...editedData,
                               bride: { ...editedData.bride, address: e.target.value }
                             })}
@@ -1141,21 +1192,7 @@ const BookingManagement = () => {
                           <p className="mt-1">{selectedBooking.bride?.address}</p>
                         )}
                       </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">Photo</label>
-                        {selectedBooking.bride?.photo ? (
-                          <div className="mt-2">
-                            <img 
-                              src={selectedBooking.bride.photo} 
-                              alt="Bride" 
-                              className="h-32 w-32 object-cover rounded-lg"
-                            />
-                          </div>
-                        ) : (
-                          <p className="mt-1 text-gray-500">No photo uploaded</p>
-                        )}
-                      </div>
-                      <div>
+                      <div className="col-span-2">
                         <label className="block text-sm font-medium text-gray-700">Documents</label>
                         {selectedBooking.bride?.documents && selectedBooking.bride.documents.length > 0 ? (
                           <div className="mt-2 space-y-2">
@@ -1178,10 +1215,8 @@ const BookingManagement = () => {
                         )}
                       </div>
                     </div>
-                  </div>
-
-                  <div className="border-b pb-4">
-                    <h3 className="text-lg font-medium mb-4">Groom Information</h3>
+                  </CollapsibleSection>
+                  <CollapsibleSection title="Groom Information">
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700">Name</label>
@@ -1189,7 +1224,7 @@ const BookingManagement = () => {
                           <input
                             type="text"
                             value={editedData.groom?.name || ''}
-                            onChange={(e) => setEditedData({
+                            onChange={e => setEditedData({
                               ...editedData,
                               groom: { ...editedData.groom, name: e.target.value }
                             })}
@@ -1200,12 +1235,20 @@ const BookingManagement = () => {
                         )}
                       </div>
                       <div>
+                        <label className="block text-sm font-medium text-gray-700">Photo</label>
+                        {selectedBooking.groom?.photo ? (
+                          <img src={selectedBooking.groom.photo} alt="Groom" className="h-24 w-24 rounded-lg mt-1" />
+                        ) : (
+                          <p className="mt-1 text-gray-500">No photo uploaded</p>
+                        )}
+                      </div>
+                      <div>
                         <label className="block text-sm font-medium text-gray-700">Father's Name</label>
                         {isEditing ? (
                           <input
                             type="text"
                             value={editedData.groom?.fatherName || ''}
-                            onChange={(e) => setEditedData({
+                            onChange={e => setEditedData({
                               ...editedData,
                               groom: { ...editedData.groom, fatherName: e.target.value }
                             })}
@@ -1221,7 +1264,7 @@ const BookingManagement = () => {
                           <input
                             type="text"
                             value={editedData.groom?.motherName || ''}
-                            onChange={(e) => setEditedData({
+                            onChange={e => setEditedData({
                               ...editedData,
                               groom: { ...editedData.groom, motherName: e.target.value }
                             })}
@@ -1237,7 +1280,7 @@ const BookingManagement = () => {
                           <input
                             type="number"
                             value={editedData.groom?.age || ''}
-                            onChange={(e) => setEditedData({
+                            onChange={e => setEditedData({
                               ...editedData,
                               groom: { ...editedData.groom, age: e.target.value }
                             })}
@@ -1253,7 +1296,7 @@ const BookingManagement = () => {
                           <input
                             type="tel"
                             value={editedData.groom?.contactNumber || ''}
-                            onChange={(e) => setEditedData({
+                            onChange={e => setEditedData({
                               ...editedData,
                               groom: { ...editedData.groom, contactNumber: e.target.value }
                             })}
@@ -1269,7 +1312,7 @@ const BookingManagement = () => {
                           <input
                             type="email"
                             value={editedData.groom?.email || ''}
-                            onChange={(e) => setEditedData({
+                            onChange={e => setEditedData({
                               ...editedData,
                               groom: { ...editedData.groom, email: e.target.value }
                             })}
@@ -1284,7 +1327,7 @@ const BookingManagement = () => {
                         {isEditing ? (
                           <textarea
                             value={editedData.groom?.address || ''}
-                            onChange={(e) => setEditedData({
+                            onChange={e => setEditedData({
                               ...editedData,
                               groom: { ...editedData.groom, address: e.target.value }
                             })}
@@ -1295,21 +1338,7 @@ const BookingManagement = () => {
                           <p className="mt-1">{selectedBooking.groom?.address}</p>
                         )}
                       </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">Photo</label>
-                        {selectedBooking.groom?.photo ? (
-                          <div className="mt-2">
-                            <img 
-                              src={selectedBooking.groom.photo} 
-                              alt="Groom" 
-                              className="h-32 w-32 object-cover rounded-lg"
-                            />
-                          </div>
-                        ) : (
-                          <p className="mt-1 text-gray-500">No photo uploaded</p>
-                        )}
-                      </div>
-                      <div>
+                      <div className="col-span-2">
                         <label className="block text-sm font-medium text-gray-700">Documents</label>
                         {selectedBooking.groom?.documents && selectedBooking.groom.documents.length > 0 ? (
                           <div className="mt-2 space-y-2">
@@ -1332,10 +1361,8 @@ const BookingManagement = () => {
                         )}
                       </div>
                     </div>
-                  </div>
-
-                  <div className="border-b pb-4">
-                    <h3 className="text-lg font-medium mb-4">Ceremony Details</h3>
+                  </CollapsibleSection>
+                  <CollapsibleSection title="Ceremony Details">
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700">Ceremony Date</label>
@@ -1343,7 +1370,7 @@ const BookingManagement = () => {
                           <input
                             type="date"
                             value={new Date(editedData.ceremonyDate).toISOString().split('T')[0]}
-                            onChange={(e) => setEditedData({
+                            onChange={e => setEditedData({
                               ...editedData,
                               ceremonyDate: e.target.value
                             })}
@@ -1355,45 +1382,100 @@ const BookingManagement = () => {
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700">Status</label>
-                        <p className="mt-1">
-                          <span className={`px-2 py-1 rounded-full text-sm ${
-                            selectedBooking.status === 'confirmed' ? 'bg-green-100 text-green-800' :
-                            selectedBooking.status === 'approved' ? 'bg-blue-100 text-blue-800' :
-                            selectedBooking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                            selectedBooking.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
-                            {selectedBooking.status}
-                          </span>
-                        </p>
+                        <span className={`px-2 py-1 rounded-full text-sm ${
+                          selectedBooking.status === 'confirmed' ? 'bg-green-100 text-green-800' :
+                          selectedBooking.status === 'approved' ? 'bg-blue-100 text-blue-800' :
+                          selectedBooking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                          selectedBooking.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {selectedBooking.status}
+                        </span>
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700">Payment Status</label>
-                        <p className="mt-1">
-                          <span className={`px-2 py-1 rounded-full text-sm ${
-                            selectedBooking.paymentStatus === 'paid' ? 'bg-green-100 text-green-800' :
-                            'bg-yellow-100 text-yellow-800'
-                          }`}>
-                            {selectedBooking.paymentStatus}
-                          </span>
-                        </p>
+                        <span className={`px-2 py-1 rounded-full text-sm ${
+                          selectedBooking.paymentStatus === 'paid' ? 'bg-green-100 text-green-800' :
+                          'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {selectedBooking.paymentStatus}
+                        </span>
                       </div>
                       {selectedBooking.rejectionReason && (
-                        <div>
+                        <div className="col-span-2">
+                          <label className="block text-sm font-medium text-gray-700">Rejection Reason</label>
+                          <p className="mt-1 text-red-600">{selectedBooking.rejectionReason}</p>
+                        </div>
+                      )}
+                    </div>
+                  </CollapsibleSection>
+                </>
+              )}
+
+              {selectedBooking.eventType === 'Student Award Registration' && (
+                <div className="space-y-6">
+                  <div className="border-b pb-4">
+                    <h3 className="text-lg font-medium mb-4">Student Award Details</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Name</label>
+                        <p className="mt-1">{selectedBooking.name}</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">School Name</label>
+                        <p className="mt-1">{selectedBooking.schoolName}</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Standard</label>
+                        <p className="mt-1">{selectedBooking.standard}</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Board Name</label>
+                        <p className="mt-1">{selectedBooking.boardName}</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Exam Year</label>
+                        <p className="mt-1">{selectedBooking.examYear}</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Total Percentage</label>
+                        <p className="mt-1">{selectedBooking.totalPercentage}</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Rank</label>
+                        <p className="mt-1">{selectedBooking.rank}</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Marksheet</label>
+                        <a href={selectedBooking.marksheet} target="_blank" rel="noopener noreferrer" className="text-purple-600 hover:underline">View Marksheet</a>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Status</label>
+                        <span className={`px-2 py-1 rounded-full text-sm ${
+                          selectedBooking.status === 'approved' ? 'bg-green-100 text-green-800' :
+                          selectedBooking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                          selectedBooking.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {selectedBooking.status}
+                        </span>
+                      </div>
+                      {selectedBooking.rejectionReason && (
+                        <div className="col-span-2">
                           <label className="block text-sm font-medium text-gray-700">Rejection Reason</label>
                           <p className="mt-1 text-red-600">{selectedBooking.rejectionReason}</p>
                         </div>
                       )}
                     </div>
                   </div>
-                </>
+                </div>
               )}
 
               <div className="flex justify-end space-x-3 mt-6">
                 {!isEditing && (
                   <button
                     onClick={handleStartEditing}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                    className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700"
                   >
                     Edit Booking
                   </button>
